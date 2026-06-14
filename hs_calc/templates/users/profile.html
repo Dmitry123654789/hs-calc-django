@@ -1,0 +1,76 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}
+    Профиль
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center fade-in">
+    <div class="col-md-8 col-lg-6">
+        <div class="content-container p-4 p-md-5">
+            <h2 class="text-center mb-4">Профиль пользователя</h2>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Имя пользователя</label>
+                        <p class="form-control-plaintext">{{ user.username }}</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Email</label>
+                        <p class="form-control-plaintext">{{ user.email }}</p>
+                    </div>
+
+                    {% translate "Не указано" as not_specified %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Имя</label>
+                        <p class="form-control-plaintext">
+                            {{ user.first_name|default:not_specified }}
+                        </p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Фамилия</label>
+                        <p class="form-control-plaintext">
+                            {{ user.last_name|default:not_specified }}
+                        </p>
+                    </div>
+
+                    {% if user.profile %}
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Роль</label>
+                            <p class="form-control-plaintext">{{ user.profile.get_role_display|capfirst }}</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Телефон</label>
+                            <p class="form-control-plaintext">{{ user.profile.phone.as_international|default:not_specified }}</p>
+                        </div>
+
+                        {% if user.profile.is_manager %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Процент с продажи</label>
+                                <p class="form-control-plaintext">{{ user.profile.percentage_sale }}%</p>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Дата регистрации</label>
+                        <p class="form-control-plaintext">{{ user.date_joined|date:"d.m.Y H:i" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="d-grid gap-2 mt-4">
+                <a href="{% url 'users:password_change' %}" class="btn btn-outline-primary">
+                    Сменить пароль
+                </a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

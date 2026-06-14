@@ -1,0 +1,245 @@
+{% extends "base.html" %}
+
+{% load static %}
+
+{% block title %}Результаты расчета{% endblock %}
+
+{% block content %}
+<h2 class="mb-4 text-center">Результаты расчета</h2>
+
+{% for scheme_name, scheme_data in data.items %}
+    <div class="card mb-5 shadow-sm">
+        <div class="card-header bg-primary text-white d-flex justify-content-between align-middle">
+            <h4 class="mb-0">Схема {{ scheme_name }}</h4>
+        </div>
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-bordered table-hover align-middle main-table" 
+                       id="table-{{ scheme_name }}" 
+                       data-width="{{ portal_width }}" 
+                       data-height="{{ portal_height }}">
+                    <thead class="table-dark">
+                        <tr>
+                            <th>ВИД</th>
+                            <th>ЦЕНА</th>
+                            <th>РАЗМЕР, мм</th>
+                            <th>КОЛ-ВО</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for detail_name, detail_data in scheme_data.items %}
+                            {% if detail_data and detail_data.price is not None %}
+                                {# Отрисовка элементов из w_list #}
+                                {% for size, count in detail_data.w_list.items %}
+                                    {% if size != 0 and count != 0 %}
+                                    <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                        <td class="cell-name">{{ detail_name }}</td>
+                                        <td class="cell-price">{{ detail_data.price|floatformat:2 }}</td>
+                                        <td>{{ size }}</td>
+                                        <td>{{ count }}</td>
+                                    </tr>
+                                    {% endif %}
+                                {% endfor %}
+
+                                {# Отрисовка элементов из h_list #}
+                                {% for size, count in detail_data.h_list.items %}
+                                    {% if size != 0 and count != 0 %}
+                                    <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                        <td class="cell-name">{{ detail_name }}</td>
+                                        <td class="cell-price">{{ detail_data.price|floatformat:2 }}</td>
+                                        <td>{{ size }}</td>
+                                        <td>{{ count }}</td>
+                                    </tr>
+                                    {% endif %}
+                                {% endfor %}
+                            {% endif %}
+                        {% endfor %}
+
+                        {# Строка ИТОГО (заполняется через JS) #}
+                        <tr class="table-secondary fw-bold total-row">
+                            <td>ИТОГО</td>
+                            <td class="total-price-cell">0.00</td>
+                            <td colspan="2"></td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+            
+            <button class="btn btn-success download-btn mb-4" onclick="exportToExcel('{{ scheme_name }}', 'Схема_{{ scheme_name }}')">
+                <i class="bi bi-file-earmark-excel"></i> Скачать себестоимость в Excel
+            </button>
+
+            {# Блок трудозатрат (если labor_data передан в контекст) #}
+            {% if labor_data %}
+                {% for labor_scheme, labor_details in labor_data.items %}
+                    {% if labor_scheme == scheme_name %}
+                    <hr class="my-4">
+                    <h5 class="mb-3 text-secondary">Трудозатраты для схемы {{ scheme_name }}</h5>
+                    
+                    {# Скрытая таблица для экспорта трудозатрат #}
+                    <table id="labor-{{ scheme_name }}" style="display: none;" class="table table-striped table-bordered labor-table" data-width="{{ portal_width }}" data-height="{{ portal_height }}">
+                        <thead class="table-dark">
+                            <tr>
+                                <th>Деталь</th>
+                                <th>Столяр</th>
+                                <th>Маляр</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {% for detail, costs in labor_details.items %}
+                            <tr class="labor-row" data-stolyar="{{ costs.столяр }}" data-malyar="{{ costs.маляр }}">
+                                <td>{{ detail }}</td>
+                                <td>{{ costs.столяр }}</td>
+                                <td>{{ costs.маляр }}</td>
+                            </tr>
+                            {% endfor %}
+                            <tr class="table-secondary fw-bold">
+                                <td>ИТОГО</td>
+                                <td class="total-stolyar-cell">0.00</td>
+                                <td class="total-malyar-cell">0.00</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    
+                    <button class="btn btn-info text-white download-btn labor-btn" onclick="exportLaborToExcel('{{ scheme_name }}', 'Трудозатраты_схема_{{ scheme_name }}')">
+                        <i class="bi bi-tools"></i> Скачать трудозатраты в Excel
+                    </button>
+                    {% endif %}
+                {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+{% endfor %}
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/xlsx.full.min.js' %}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Обработка основных таблиц (Объединение rowspan и подсчет ИТОГО)
+        document.querySelectorAll(".main-table").forEach(function(table) {
+            const rows = table.querySelectorAll("tbody tr.detail-row");
+            let currentDetail = null;
+            let startRowIdx = 0;
+            let currentSpan = 0;
+            let totalPrice = 0;
+            let uniqueDetails = new Set();
+
+            rows.forEach(function(row, index) {
+                const detailName = row.getAttribute("data-detail-name");
+                const detailPrice = parseFloat(row.getAttribute("data-detail-price")) || 0;
+
+                // Считаем цену за каждую уникальную деталь только один раз
+                if (!uniqueDetails.has(detailName)) {
+                    uniqueDetails.add(detailName);
+                    totalPrice += detailPrice;
+                }
+
+                if (currentDetail === null) {
+                    currentDetail = detailName;
+                    startRowIdx = index;
+                    currentSpan = 1;
+                } else if (currentDetail === detailName) {
+                    currentSpan++;
+                    // Удаляем дублирующиеся ячейки, чтобы rowspan встал корректно
+                    row.querySelector(".cell-name").remove();
+                    row.querySelector(".cell-price").remove();
+                } else {
+                    // Применяем rowspan к предыдущей группе
+                    const firstRowOfGroup = rows[startRowIdx];
+                    firstRowOfGroup.querySelector(".cell-name").setAttribute("rowspan", currentSpan);
+                    firstRowOfGroup.querySelector(".cell-price").setAttribute("rowspan", currentSpan);
+
+                    // Инициализируем новую группу деталей
+                    currentDetail = detailName;
+                    startRowIdx = index;
+                    currentSpan = 1;
+                }
+            });
+
+            // Накатываем rowspan на последнюю группу в таблице
+            if (currentSpan > 0 && rows.length > 0) {
+                const firstRowOfGroup = rows[startRowIdx];
+                firstRowOfGroup.querySelector(".cell-name").setAttribute("rowspan", currentSpan);
+                firstRowOfGroup.querySelector(".cell-price").setAttribute("rowspan", currentSpan);
+            }
+
+            // Записываем финальную сумму в ячейку ИТОГО
+            const totalCell = table.querySelector(".total-price-cell");
+            if (totalCell) {
+                totalCell.textContent = totalPrice.toFixed(2);
+            }
+        });
+
+        // 2. Обработка таблиц трудозатрат (Подсчет ИТОГО)
+        document.querySelectorAll(".labor-table").forEach(function(table) {
+            const rows = table.querySelectorAll("tbody tr.labor-row");
+            let totalStolyar = 0;
+            let totalMalyar = 0;
+
+            rows.forEach(function(row) {
+                totalStolyar += parseFloat(row.getAttribute("data-stolyar")) || 0;
+                totalMalyar += parseFloat(row.getAttribute("data-malyar")) || 0;
+            });
+
+            const stolyarCell = table.querySelector(".total-stolyar-cell");
+            const malyarCell = table.querySelector(".total-malyar-cell");
+            if (stolyarCell) stolyarCell.textContent = totalStolyar.toFixed(2);
+            if (malyarCell) malyarCell.textContent = totalMalyar.toFixed(2);
+        });
+    });
+
+    // Функция формирования листа с мета-данными в шапке (ширина, высота)
+    function createWorksheetWithHeader(table, schemeName) {
+        const width = table.getAttribute('data-width');
+        const height = table.getAttribute('data-height');
+
+        // Генерируем базовый лист из структуры DOM
+        const ws = XLSX.utils.table_to_sheet(table);
+        const tableArray = XLSX.utils.sheet_to_json(ws, {header: 1});
+
+        // Добавляем техническую строку на самый верх
+        const header = [`Схема ${schemeName.slice(-1)}, ${width}, ${height}`];
+        tableArray.unshift(header);
+
+        const newWs = XLSX.utils.aoa_to_sheet(tableArray);
+
+        // Переносим и сдвигаем на 1 строку вниз все объединенные области (rowspan)
+        if (ws['!merges']) {
+            newWs['!merges'] = ws['!merges'].map(merge => {
+                return {
+                    s: {r: merge.s.r + 1, c: merge.s.c},
+                    e: {r: merge.e.r + 1, c: merge.e.c}
+                };
+            });
+        }
+
+        return newWs;
+    }
+
+    // Экспорт себестоимости
+    function exportToExcel(schemeName, fileName) {
+        const table = document.getElementById(`table-${schemeName}`);
+        const ws = createWorksheetWithHeader(table, schemeName);
+        const wb = XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(wb, ws, "Данные");
+        XLSX.writeFile(wb, `${fileName}.xlsx`);
+    }
+
+    // Экспорт трудозатрат
+    function exportLaborToExcel(schemeName, fileName) {
+        const table = document.getElementById(`labor-${schemeName}`);
+        if (!table) {
+            alert('Нет данных о трудозатратах для этой схемы');
+            return;
+        }
+
+        const ws = createWorksheetWithHeader(table, schemeName);
+        const wb = XLSX.utils.book_new();
+
+        XLSX.utils.book_append_sheet(wb, ws, "Трудозатраты");
+        XLSX.writeFile(wb, `${fileName}.xlsx`);
+    }
+</script>
+{% endblock %}

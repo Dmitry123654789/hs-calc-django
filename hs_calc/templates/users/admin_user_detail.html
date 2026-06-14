@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}
+    Просмотр пользователя — {{ target_user.username }}
+{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center fade-in mt-4">
+    <div class="col-md-8 col-lg-6">
+        <div class="content-container p-4 p-md-5">
+            <div class="mb-3">
+                <a href="{% url 'users:admin_user_list' %}" class="btn btn-sm btn-outline-secondary">
+                    &larr; Назад к списку
+                </a>
+            </div>
+            
+            <h2 class="text-center mb-4">Профиль пользователя</h2>
+
+            <div class="card border-0 shadow-sm">
+                <div class="card-body">
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Имя пользователя</label>
+                        <p class="form-control-plaintext">{{ target_user.username }}</p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Email</label>
+                        <p class="form-control-plaintext">{{ target_user.email }}</p>
+                    </div>
+
+                    {% translate "Не указано" as not_specified %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Имя</label>
+                        <p class="form-control-plaintext">
+                            {{ target_user.first_name|default:not_specified }}
+                        </p>
+                    </div>
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Фамилия</label>
+                        <p class="form-control-plaintext">
+                            {{ target_user.last_name|default:not_specified }}
+                        </p>
+                    </div>
+
+                    {% if target_user.profile %}
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Роль</label>
+                            <p class="form-control-plaintext">{{ target_user.profile.get_role_display|capfirst }}</p>
+                        </div>
+
+                        <div class="mb-3">
+                            <label class="form-label text-muted small mb-1">Телефон</label>
+                            <p class="form-control-plaintext">{{ target_user.profile.phone.as_international|default:not_specified }}</p>
+                        </div>
+
+                        {% if target_user.profile.is_manager %}
+                            <div class="mb-3">
+                                <label class="form-label text-muted small mb-1">Процент с продажи</label>
+                                <p class="form-control-plaintext">{{ target_user.profile.percentage_sale }}%</p>
+                            </div>
+                        {% endif %}
+                    {% endif %}
+
+                    <div class="mb-3">
+                        <label class="form-label text-muted small mb-1">Дата регистрации</label>
+                        <p class="form-control-plaintext">{{ target_user.date_joined|date:"d.m.Y H:i" }}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div class="mt-4">
+                <form action="{% url 'users:admin_user_delete' target_user.pk %}" method="post" onsubmit="return confirm('Вы уверены, что хотите безвозвратно удалить этот аккаунт?');">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger w-100">
+                        Удалить аккаунт
+                    </button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

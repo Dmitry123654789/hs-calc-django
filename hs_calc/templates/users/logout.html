@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}Выход — {{ block.super }}{% endblock %}
+
+{% block content %}
+<h2>Выход из системы</h2>
+
+{% if user.is_authenticated %}
+    <p>"Вы уверены, что хотите выйти?</p>
+    <form method="post">
+        {% csrf_token %}
+        <button type="submit" class="btn">"Выйти</button>
+        <a href="{% url 'pages:home' %}" class="btn btn-secondary">"Отмена</a>
+    </form>
+{% else %}
+    <p>"Вы уже вышли из системы.</p>
+    <div style="margin-top: 20px;">
+        <a href="{% url 'users:login' %}" class="btn">"Войти снова</a>
+    </div>
+{% endif %}
+{% endblock %}

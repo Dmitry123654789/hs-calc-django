@@ -1,0 +1,675 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Расчет глухарей{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Формирование заказа глухарей</h2>
+
+    <form id="glukharForm">
+        {% csrf_token %}
+        
+        <div class="card mb-4 bg-light shadow-sm">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">🌲 Материал:</label>
+                        <select name="material" class="form-select" required>
+                            <option value="сосна">Сосна</option>
+                            <option value="дуб">Дуб</option>
+                            <option value="лиственница">Лиственница</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">🖌 Покраска:</label>
+                        <select name="color" class="form-select" required>
+                            <option value="RAL">RAL</option>
+                            <option value="Лесс">Лесс</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label fw-bold">👤 Покупатель:</label>
+                        <select id="buyerSelect" class="form-select">
+                            <option value="null">-- Без покупателя --</option>
+                            <option value="new">+ Новый покупатель</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-12" id="newBuyerFields" style="display: none;">
+                        <div class="row g-2">
+                            <div class="col-md-3"><input type="text" id="buyerFirstName" class="form-control" placeholder="Имя"></div>
+                            <div class="col-md-3"><input type="text" id="buyerLastName" class="form-control" placeholder="Фамилия"></div>
+                            <div class="col-md-3"><input type="text" id="buyerPhone" class="form-control" placeholder="Телефон"></div>
+                            <div class="col-md-3"><input type="email" id="buyerEmail" class="form-control" placeholder="Email"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="glukharContainer" class="row"></div>
+
+        <div class="d-flex flex-wrap gap-3 mt-4 mb-5 align-items-center">
+            <button type="button" class="btn btn-outline-primary" id="addGlukharBtn">
+                <i class="bi bi-plus-circle"></i> Добавить глухарь
+            </button>
+            <div class="ms-auto d-flex gap-3 align-items-center">
+                <button type="submit" class="btn btn-success btn-lg" id="calculateBtn">РАССЧИТАТЬ</button>
+            </div>
+        </div>
+    </form>
+
+    <div id="resultsContainer" class="mt-4"></div>
+</div>
+
+<template id="glukharCardTemplate">
+    <div class="col-md-6 col-lg-4 mb-3 glukhar-card-wrapper">
+        <div class="card h-100 shadow-sm glukhar-card border-secondary">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <span class="fw-bold glukhar-title">Глухарь #1</span>
+                <button type="button" class="btn-close btn-close-sm remove-glukhar-btn" aria-label="Удалить" title="Удалить эту позицию"></button>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Ширина (мм)</label>
+                        <input type="number" class="form-control form-control-sm g-width" required min="1200" value="1200" placeholder="1200">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Высота (мм)</label>
+                        <input type="number" class="form-control form-control-sm g-height" required min="2100" value="2100" placeholder="2100">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Количество (шт)</label>
+                        <input type="number" class="form-control form-control-sm g-amount" required min="1" value="1">
+                    </div>
+                    <div class="col-6 d-flex align-items-end">
+                        <div class="form-check">
+                            <input class="form-check-input g-not-rect" type="checkbox">
+                            <label class="form-check-label small">Не прямоугольник</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const container = document.getElementById('glukharContainer');
+        const template = document.getElementById('glukharCardTemplate');
+        const addBtn = document.getElementById('addGlukharBtn');
+        const form = document.getElementById('glukharForm');
+        const resultContainer = document.getElementById('resultsContainer');
+        const buyerSelect = document.getElementById('buyerSelect');
+        const newBuyerFields = document.getElementById('newBuyerFields');
+        
+        let glukharCount = 0;
+        let lastCalculationResult = null;
+        let lastPayload = null;
+        let originalDimensions = [];
+        
+        // Глобальные переменные для динамического пересчета
+        let baseTotalPrice = 0;
+        let totalArea = 0;
+
+        // --- ФУНКЦИЯ КРАСИВЫХ АЛЕРТОВ ---
+        function showAlert(message, type = 'danger') {
+            document.querySelectorAll('.custom-alert').forEach(el => el.remove());
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} mt-4 custom-alert alert-dismissible fade show shadow-sm`;
+            alertDiv.role = 'alert';
+            alertDiv.innerHTML = `
+                <strong>${type === 'danger' ? 'Ошибка!' : 'Внимание!'}</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').children[1]);
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 150);
+            }, 10000);
+        }
+
+        // 1. Загрузка списка покупателей
+        fetch('{% url "users:buyers_list" %}')
+            .then(res => res.json())
+            .then(buyers => {
+                buyers.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    let name = `${b.first_name || ''} ${b.last_name || ''}`.trim();
+                    if (!name) name = 'Без имени';
+                    if (name.length > 25) {
+                        name = name.substring(0, 25) + '...';
+                    }
+                    opt.textContent = `${name} (${b.phone || b.email || 'Нет контактов'})`;
+                    buyerSelect.appendChild(opt);
+                });
+            });
+
+        buyerSelect.addEventListener('change', function() {
+            newBuyerFields.style.display = this.value === 'new' ? 'block' : 'none';
+        });
+
+        // 2. Управление карточками
+        function addGlukharCard() {
+            glukharCount++;
+            const clone = template.content.cloneNode(true);
+            const cardWrapper = clone.querySelector('.glukhar-card-wrapper');
+            
+            clone.querySelector('.glukhar-title').textContent = `Глухарь #${glukharCount}`;
+            
+            clone.querySelector('.remove-glukhar-btn').addEventListener('click', function() {
+                cardWrapper.remove();
+                renumberCards();
+                updateTotalAmount();
+            });
+
+            clone.querySelector('.g-amount').addEventListener('input', updateTotalAmount);
+            container.appendChild(clone);
+            updateTotalAmount();
+        }
+
+        function renumberCards() {
+            const cards = container.querySelectorAll('.glukhar-card');
+            glukharCount = cards.length;
+            cards.forEach((card, index) => {
+                card.querySelector('.glukhar-title').textContent = `Глухарь #${index + 1}`;
+            });
+        }
+
+        function updateTotalAmount() {
+            let total = 0;
+            container.querySelectorAll('.g-amount').forEach(inp => {
+                total += parseInt(inp.value) || 0;
+            });
+        }
+
+        addGlukharCard();
+        addBtn.addEventListener('click', addGlukharCard);
+
+        // 3. Отправка данных на расчет
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            // ЗАПРЕТ ОТПРАВКИ, ЕСЛИ НЕТ КАРТОЧЕК
+            if (glukharCount === 0) {
+                showAlert('Пожалуйста, добавьте хотя бы один глухарь перед расчетом.', 'warning');
+                return;
+            }
+
+            const formData = new FormData(form);
+            const payload = {
+                material: formData.get('material'),
+                color: formData.get('color')
+            };
+
+            const cards = container.querySelectorAll('.glukhar-card');
+            let isValid = true;
+            originalDimensions = [];
+            totalArea = 0; // Сбрасываем площадь
+
+            cards.forEach((card, index) => {
+                const width = parseFloat(card.querySelector('.g-width').value);
+                const height = parseFloat(card.querySelector('.g-height').value);
+                const amount = parseInt(card.querySelector('.g-amount').value);
+                const isNotRect = card.querySelector('.g-not-rect').checked;
+
+                if (!width || !height || !amount) {
+                    isValid = false;
+                    return;
+                }
+
+                payload[`glukhar${index + 1}`] = {
+                    width: width, height: height, amount: amount, is_not_rectangle: isNotRect
+                };
+                originalDimensions.push({ width, height });
+                
+                // Считаем общую площадь в м² для монтажа
+                totalArea += (width * height / 1000000) * amount;
+            });
+
+            totalArea = totalArea;
+
+            if (!isValid) {
+                showAlert('Пожалуйста, заполните ширину, высоту и количество для всех карточек.');
+                return;
+            }
+
+            lastPayload = payload;
+            resultContainer.innerHTML = `<div class="text-center mt-4"><div class="spinner-border text-primary"></div><p class="mt-2">Выполняется расчет...</p></div>`;
+
+            const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
+            
+            fetch('{% url "calculate:glukhar_order" %}', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
+                body: JSON.stringify(payload)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    return response.text().then(text => {
+                        try {
+                            const errorData = JSON.parse(text);
+                            throw new Error(errorData.error || `Статус ${response.status}`);
+                        } catch (e) {
+                            throw new Error(`Сервер вернул ошибку ${response.status}.`);
+                        }
+                    });
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                lastCalculationResult = data;
+                displayResults(data, originalDimensions);
+            })
+            .catch(error => {
+                resultContainer.innerHTML = '';
+                showAlert(`Ошибка при расчете: ${error.message}`);
+            });
+        });
+
+        // 4. Отображение результатов и новых полей
+        function displayResults(data, sizesArray) {
+            if (data.error) {
+                showAlert(data.error);
+                return;
+            }
+
+            const glukharKeys = Object.keys(data).filter(k => k.startsWith('glukhar')).sort((a,b) => parseInt(a.replace('glukhar','')) - parseInt(b.replace('glukhar','')));
+            if (glukharKeys.length === 0) return;
+
+            let html = '<h3 class="mb-3 border-bottom pb-2">📊 Результаты расчета</h3><div class="row">';
+            
+            // Считаем базовую стоимость из ответа сервера
+            baseTotalPrice = 0;
+            for (let idx = 0; idx < glukharKeys.length; idx++) {
+                const key = glukharKeys[idx];
+                const glukhar = data[key];
+                const N_amount = glukhar['N'];
+                
+                let sizeExtra = '';
+                if (sizesArray[idx] && sizesArray[idx].width) {
+                    const w = sizesArray[idx].width, h = sizesArray[idx].height;
+                    sizeExtra = ` (${w} x ${h} мм, ${(w*h/1000000).toFixed(1)} м²)`;
+                }
+
+                const materialKey = Object.keys(glukhar).find(k => k.startsWith('Брус'));
+                const materialFullName = materialKey || 'Брус';
+                const color = glukhar['RAL-эмаль'] ? 'RAL' : (glukhar['Лесс-лак'] ? 'Лесс' : 'RAL');
+
+                const rowOrder = [
+                    { display: materialFullName, keyFunc: () => materialFullName, isSimpleNumber: false },
+                    { display: color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', keyFunc: () => color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', isSimpleNumber: false },
+                    ...(color === 'RAL' ? [{ display: 'RAL-грунт', keyFunc: () => 'RAL-грунт', isSimpleNumber: false }] : []),
+                    ...(color === 'Лесс' ? [{ display: 'Лесс-грунт', keyFunc: () => 'Лесс-грунт', isSimpleNumber: false }] : []),
+                    { display: 'Стеклопакет', keyFunc: () => 'Стеклопакет', isSimpleNumber: false },
+                    { display: 'Выгрузка', keyFunc: () => 'Выгрузка', isSimpleNumber: true },
+                    { display: 'Работа столяра', keyFunc: () => 'Работа столяра', isSimpleNumber: false },
+                    { display: 'Работа маляра', keyFunc: () => 'Работа маляра', isSimpleNumber: false },
+                    { display: 'ИТОГО', keyFunc: () => 'ИТОГО', isSimpleNumber: false }
+                ];
+
+                html += `<div class="col-12 mb-4">
+                    <div class="card h-100 border-primary shadow-sm">
+                        <div class="card-header bg-primary text-white fw-bold">Глухарь ${idx+1}${sizeExtra}</div>
+                        <div class="card-body p-0 table-responsive">
+                            <table class="table table-striped table-bordered table-sm mb-0">
+                                <thead class="table-light"><tr>
+                                    <th>НАИМЕНОВАНИЕ</th><th>СТОИМОСТЬ</th><th>РАЗМЕР</th>
+                                    <th>КОЛ-ВО ЗА 1 ШТ</th><th>КОЛ-ВО ЗА ${N_amount} ШТ</th><th>СТОИМОСТЬ ЗА ${N_amount} ШТ</th>
+                                </tr></thead><tbody>`;
+                
+                for (let item of rowOrder) {
+                    const rowKey = item.keyFunc();
+                    const rowData = glukhar[rowKey];
+                    if (rowData === undefined) continue;
+
+                    if (item.isSimpleNumber && typeof rowData === 'number') {
+                        if (item.display === 'Выгрузка' && rowData === 0) continue;
+                        html += `<tr><td>${item.display}</td><td>${rowData.toFixed(2)}</td><td>—</td><td>1</td><td>${N_amount}</td><td>${(rowData*N_amount).toFixed(2)}</td></tr>`;
+                    } else if (typeof rowData === 'object' && rowData !== null) {
+                        let sizeText = '—';
+                        if (rowData.length && typeof rowData.length === 'object') sizeText = `${rowData.length.w} x ${rowData.length.h}`;
+                        else if (rowData.length !== undefined && rowData.length !== '-') sizeText = rowData.length;
+                        
+                        let priceStr = typeof rowData.price === 'number' ? rowData.price.toFixed(2) : rowData.price;
+                        let nPriceStr = typeof rowData.N_price === 'number' ? rowData.N_price.toFixed(2) : rowData.N_price;
+                        
+                        let rowClass = '';
+                        if (item.display === 'ИТОГО') {
+                            rowClass = 'class="table-success fw-bold"';
+                            baseTotalPrice += parseFloat(rowData.N_price) || 0;
+                        }
+
+                        html += `<tr ${rowClass}><td>${item.display}</td><td>${priceStr}</td><td>${sizeText}</td><td>${rowData.amount}</td><td>${rowData.N_amount}</td><td>${nPriceStr}</td></tr>`;
+                    }
+                }
+                html += `</tbody></table></div></div></div>`;
+            }
+            html += '</div>';
+            
+            // Блок с дополнительными параметрами
+            html += `
+            <div class="card mb-4 bg-light shadow-sm" id="additionalCostsSection">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-3">🚚 Дополнительные параметры заказа</h5>
+                    <div class="row g-3">
+                        <div class="col-lg col-md-4">
+                            <label class="form-label fw-bold">Монтаж (руб/м²)</label>
+                            <input type="number" class="form-control cost-input" id="installRate" min=0 value="12000">
+                        </div>
+                        <div class="col-lg col-md-4">
+                            <label class="form-label fw-bold">Доставка (руб)</label>
+                            <input type="number" class="form-control cost-input" id="deliveryCost" min=0 value="50000">
+                        </div>
+                        <div class="col-lg col-md-4">
+                            <label class="form-label fw-bold">Разгрузка (руб)</label>
+                            <input type="number" class="form-control cost-input" id="unloadingCost" min=0 value="50000">
+                        </div>
+                        <div class="col-lg col-md-6">
+                            <label class="form-label fw-bold">Наценка</label>
+                            <a class="form-control bg-light" id="profitRatio" style="text-decoration: none;">{{ profit_ratio|default:1.0 }}</a>
+                        </div>
+                        <div class="col-lg col-md-6">
+                            <label class="form-label fw-bold text-danger">Скидка (руб)</label>
+                            <input type="number" class="form-control cost-input" id="discountRate" min=0 max=100 value="0">
+                        </div>
+                    </div>
+                    <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0" id="dynamicGrandTotal">
+                        ИТОГО С УЧЕТОМ ДОП. УСЛУГ: 0.00 руб.
+                    </div>
+                </div>
+            </div>`;
+            
+            html += `<div class="d-flex flex-wrap gap-2 mb-5">
+                <button type="button" class="btn btn-success" id="excelDownloadBtn">📎 Скачать в Excel</button>
+                <button type="button" class="btn btn-primary ms-auto" id="saveOrderBtn">💾 Сохранить заказ в базу</button>
+            </div>`;
+
+            resultContainer.innerHTML = html;
+
+            // Навешиваем обработчики для динамического пересчета
+            document.querySelectorAll('.cost-input').forEach(input => {
+                input.addEventListener('input', enforceMinimumsAndRecalculate);
+            });
+            
+            // Первичный пересчет при отображении
+            enforceMinimumsAndRecalculate();
+
+            document.getElementById('excelDownloadBtn').onclick = () => exportToExcel(lastCalculationResult, getFinalTotal(), originalDimensions);
+            document.getElementById('saveOrderBtn').onclick = () => saveOrder(document.getElementById('saveOrderBtn'));
+        }
+
+        // 5. Логика динамического пересчета и контроля минимумов
+        function enforceMinimumsAndRecalculate() {
+            const finalTotal = getFinalTotal();
+            document.getElementById('dynamicGrandTotal').textContent = `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toFixed(2)} руб.`;
+        }
+
+        function getFinalTotal() {
+            const installRate = parseFloat(document.getElementById('installRate').value) || 0;
+            const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
+            const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
+            const ratio = parseFloat(document.getElementById('profitRatio').textContent) || 1.0;
+            const discount = parseFloat(document.getElementById('discountRate').value) || 0;
+
+            const subTotal = (baseTotalPrice * ratio) + (totalArea * installRate) + delivery + unloading;
+            
+            return subTotal - discount;
+        }
+
+        // 6. Динамическое подключение XLSX библиотеки и функции экспорта (из glukhar1.html)
+        let xlsxPromise = null;
+        function loadXLSX() {
+            if (typeof XLSX !== 'undefined') return Promise.resolve();
+            if (xlsxPromise) return xlsxPromise;
+
+            xlsxPromise = new Promise((resolve, reject) => {
+                const script = document.createElement('script');
+                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
+                script.async = true;
+                const timeout = setTimeout(() => {
+                    reject(new Error('Таймаут загрузки библиотеки Excel. Проверьте интернет-соединение.'));
+                }, 8000);
+                script.onload = () => { clearTimeout(timeout); resolve(); };
+                script.onerror = () => { clearTimeout(timeout); reject(new Error('Ошибка загрузки XLSX. Возможно, CDN заблокирован.')); };
+                document.head.appendChild(script);
+            });
+            return xlsxPromise;
+        }
+
+        function exportToCSV(data, totalPrice, sizesArray) {
+            const glukharKeys = Object.keys(data).filter(k => k.startsWith('glukhar')).sort((a,b) => parseInt(a.replace('glukhar','')) - parseInt(b.replace('glukhar','')));
+            let csvRows = [];
+
+            for (let idx = 0; idx < glukharKeys.length; idx++) {
+                const key = glukharKeys[idx];
+                const glukhar = data[key];
+                const N_amount = glukhar['N'];
+                const materialKey = Object.keys(glukhar).find(k => k.startsWith('Брус'));
+                const materialFullName = materialKey || 'Брус';
+                const color = glukhar['RAL-эмаль'] ? 'RAL' : (glukhar['Лесс-лак'] ? 'Лесс' : 'RAL');
+
+                const rowOrder = [
+                    { display: materialFullName, keyFunc: () => materialFullName },
+                    { display: color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', keyFunc: () => color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак' },
+                    ...(color === 'RAL' ? [{ display: 'RAL-грунт', keyFunc: () => 'RAL-грунт' }] : []),
+                    ...(color === 'Лесс' ? [{ display: 'Лесс-грунт', keyFunc: () => 'Лесс-грунт' }] : []),
+                    { display: 'Стеклопакет', keyFunc: () => 'Стеклопакет' },
+                    { display: 'Выгрузка', keyFunc: () => 'Выгрузка', isSimpleNumber: true },
+                    { display: 'Работа столяра', keyFunc: () => 'Работа столяра' },
+                    { display: 'Работа маляра', keyFunc: () => 'Работа маляра' },
+                    { display: 'ИТОГО', keyFunc: () => 'ИТОГО' }
+                ];
+
+                let headerName = `Глухарь ${idx+1}`;
+                if (sizesArray && sizesArray[idx] && sizesArray[idx].width && sizesArray[idx].height) {
+                    const w = sizesArray[idx].width;
+                    const h = sizesArray[idx].height;
+                    headerName += ` (${w} x ${h} мм, площадь ${(w*h/1000000).toFixed(1)} м²)`;
+                }
+                csvRows.push([headerName]);
+                csvRows.push(['НАИМЕНОВАНИЕ', 'СТОИМОСТЬ', 'РАЗМЕР', 'КОЛ-ВО ЗА 1 ШТ', `КОЛ-ВО ЗА ${N_amount} ШТ`, `СТОИМОСТЬ ЗА ${N_amount} ШТ`]);
+
+                for (let item of rowOrder) {
+                    const rowKey = item.keyFunc();
+                    const rowData = glukhar[rowKey];
+                    if (rowData === undefined) continue;
+
+                    if (item.isSimpleNumber && typeof rowData === 'number') {
+                        if (item.display === 'Выгрузка' && rowData === 0) continue;
+                        csvRows.push([item.display, rowData.toFixed(2), '—', 1, N_amount, (rowData * N_amount).toFixed(2)]);
+                        continue;
+                    }
+
+                    if (typeof rowData === 'object' && rowData !== null) {
+                        let sizeText = '—';
+                        if (rowData.length && typeof rowData.length === 'object') {
+                            sizeText = `${rowData.length.w} x ${rowData.length.h}`;
+                        } else if (rowData.length !== undefined && rowData.length !== '-') {
+                            sizeText = rowData.length;
+                        }
+                        csvRows.push([
+                            item.display,
+                            typeof rowData.price === 'number' ? rowData.price.toFixed(2) : rowData.price,
+                            sizeText,
+                            rowData.amount,
+                            rowData.N_amount,
+                            typeof rowData.N_price === 'number' ? rowData.N_price.toFixed(2) : rowData.N_price
+                        ]);
+                    }
+                }
+                csvRows.push([]);
+            }
+
+            // Добавляем дополнительные параметры в CSV
+            csvRows.push(['Монтаж (руб/м²)', document.getElementById('installRate').value]);
+            csvRows.push(['Доставка (руб)', document.getElementById('deliveryCost').value]);
+            csvRows.push(['Разгрузка (руб)', document.getElementById('unloadingCost').value]);
+            csvRows.push(['Наценка', document.getElementById('profitRatio').textContent]);
+            csvRows.push(['Скидка (руб)', document.getElementById('discountRate').value]);
+            csvRows.push([]);
+            csvRows.push([`ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${totalPrice.toFixed(2)} руб.`]);
+
+            const csvContent = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';')).join('\n');
+            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.setAttribute('download', `glukhari_order_${new Date().toISOString().slice(0,19)}.csv`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        }
+
+        async function exportToExcel(data, finalTotal, sizesArray) {
+            try {
+                await loadXLSX();
+                const glukharKeys = Object.keys(data).filter(k => k.startsWith('glukhar')).sort((a,b) => parseInt(a.replace('glukhar','')) - parseInt(b.replace('glukhar','')));
+                const allRows = [];
+
+                for (let idx = 0; idx < glukharKeys.length; idx++) {
+                    const key = glukharKeys[idx];
+                    const glukhar = data[key];
+                    const N_amount = glukhar['N'];
+                    const materialKey = Object.keys(glukhar).find(k => k.startsWith('Брус'));
+                    const materialFullName = materialKey || 'Брус';
+                    const color = glukhar['RAL-эмаль'] ? 'RAL' : (glukhar['Лесс-лак'] ? 'Лесс' : 'RAL');
+
+                    const rowOrder = [
+                        { display: materialFullName, keyFunc: () => materialFullName, isSimpleNumber: false },
+                        { display: color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', keyFunc: () => color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', isSimpleNumber: false },
+                        ...(color === 'RAL' ? [{ display: 'RAL-грунт', keyFunc: () => 'RAL-грунт', isSimpleNumber: false }] : []),
+                        ...(color === 'Лесс' ? [{ display: 'Лесс-грунт', keyFunc: () => 'Лесс-грунт', isSimpleNumber: false }] : []),
+                        { display: 'Стеклопакет', keyFunc: () => 'Стеклопакет', isSimpleNumber: false },
+                        { display: 'Выгрузка', keyFunc: () => 'Выгрузка', isSimpleNumber: true },
+                        { display: 'Работа столяра', keyFunc: () => 'Работа столяра', isSimpleNumber: false },
+                        { display: 'Работа маляра', keyFunc: () => 'Работа маляра', isSimpleNumber: false },
+                        { display: 'ИТОГО', keyFunc: () => 'ИТОГО', isSimpleNumber: false }
+                    ];
+
+                    let headerName = `Глухарь ${idx+1}`;
+                    if (sizesArray && sizesArray[idx] && sizesArray[idx].width && sizesArray[idx].height) {
+                        const w = sizesArray[idx].width, h = sizesArray[idx].height;
+                        headerName += ` (${w} x ${h} мм, площадь ${(w*h/1000000).toFixed(1)} м²)`;
+                    }
+                    allRows.push([headerName]);
+                    allRows.push(['НАИМЕНОВАНИЕ', 'СТОИМОСТЬ', 'РАЗМЕР', 'КОЛ-ВО ЗА 1 ШТ', `КОЛ-ВО ЗА ${N_amount} ШТ`, `СТОИМОСТЬ ЗА ${N_amount} ШТ`]);
+
+                    for (let item of rowOrder) {
+                        const rowKey = item.keyFunc();
+                        const rowData = glukhar[rowKey];
+                        if (rowData === undefined) continue;
+
+                        if (item.isSimpleNumber && typeof rowData === 'number') {
+                            if (item.display === 'Выгрузка' && rowData === 0) continue;
+                            allRows.push([item.display, rowData, '—', 1, N_amount, rowData * N_amount]);
+                            continue;
+                        }
+
+                        if (typeof rowData === 'object' && rowData !== null) {
+                            let sizeText = '—';
+                            if (rowData.length && typeof rowData.length === 'object') {
+                                sizeText = `${rowData.length.w} x ${rowData.length.h}`;
+                            } else if (rowData.length !== undefined && rowData.length !== '-') {
+                                sizeText = rowData.length;
+                            }
+                            const price = typeof rowData.price === 'number' ? rowData.price : parseFloat(rowData.price);
+                            const n_price = typeof rowData.N_price === 'number' ? rowData.N_price : parseFloat(rowData.N_price);
+                            allRows.push([
+                                item.display,
+                                isNaN(price) ? rowData.price : price,
+                                sizeText,
+                                rowData.amount,
+                                rowData.N_amount,
+                                isNaN(n_price) ? rowData.N_price : n_price
+                            ]);
+                        }
+                    }
+                    allRows.push([]);
+                }
+
+                // Добавление блока дополнительных услуг в конец Excel файла
+                allRows.push(['ДОПОЛНИТЕЛЬНЫЕ УСЛУГИ И ПАРАМЕТРЫ']);
+                allRows.push(['Монтаж (руб/м²)', parseFloat(document.getElementById('installRate').value) || 0]);
+                allRows.push(['Доставка (руб)', parseFloat(document.getElementById('deliveryCost').value) || 0]);
+                allRows.push(['Разгрузка (руб)', parseFloat(document.getElementById('unloadingCost').value) || 0]);
+                allRows.push(['Наценка', parseFloat(document.getElementById('profitRatio').textContent) || 1.0]);
+                allRows.push(['Скидка (руб)', parseFloat(document.getElementById('discountRate').value) || 0]);
+                allRows.push([]);
+                allRows.push([`ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toFixed(2)} руб.`]);
+
+                const ws = XLSX.utils.aoa_to_sheet(allRows);
+                ws['!cols'] = [{wch:25},{wch:12},{wch:18},{wch:14},{wch:18},{wch:18}];
+                const wb = XLSX.utils.book_new();
+                XLSX.utils.book_append_sheet(wb, ws, 'Глухари');
+                XLSX.writeFile(wb, `glukhari_order_${new Date().toISOString().slice(0,19)}.xlsx`);
+            } catch (err) {
+                console.warn('Ошибка загрузки XLSX, используем CSV:', err);
+                const useCSV = confirm('Не удалось загрузить библиотеку Excel. Скачать отчёт в формате CSV?');
+                if (useCSV) {
+                    exportToCSV(data, finalTotal, sizesArray);
+                } else {
+                    showAlert('Экспорт отменён.');
+                }
+            }
+        }
+
+        // 7. Сохранение заказа в базу (с новыми полями)
+        async function saveOrder(btnElement) {
+            if (!lastPayload) return;
+            const payload = { ...lastPayload };
+            payload.buyer_id = buyerSelect.value;
+            
+            // Добавляем новые параметры в payload
+            payload.installation = parseFloat(document.getElementById('installRate').value) || 12000;
+            payload.delivery = parseFloat(document.getElementById('deliveryCost').value) || 50000;
+            payload.unloading = parseFloat(document.getElementById('unloadingCost').value) || 50000;
+            payload.profit_ratio = parseFloat(document.getElementById('profitRatio').textContent) || 1.0;
+            payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
+            
+            if (payload.buyer_id === 'new') {
+                payload.buyer_data = {
+                    first_name: document.getElementById('buyerFirstName').value,
+                    last_name: document.getElementById('buyerLastName').value,
+                    phone: document.getElementById('buyerPhone').value,
+                    email: document.getElementById('buyerEmail').value
+                };
+            }
+            
+            btnElement.disabled = true;
+            btnElement.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+
+            try {
+                const response = await fetch('{% url "calculate:glukhar_save" %}', {
+                    method: 'POST',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value 
+                    },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showAlert(`Заказ успешно сохранен!`, 'success');
+                    btnElement.innerHTML = 'Заказ сохранен';
+                    btnElement.classList.replace('btn-primary', 'btn-secondary');
+                } else {
+                    showAlert('Ошибка сохранения: ' + data.error);
+                    btnElement.disabled = false;
+                    btnElement.innerHTML = '💾 Сохранить заказ в базу';
+                }
+            } catch (err) {
+                showAlert('Ошибка соединения: ' + err.message);
+                btnElement.disabled = false;
+                btnElement.innerHTML = '💾 Сохранить заказ в базу';
+                }
+            }
+        });
+</script>
+{% endblock %}

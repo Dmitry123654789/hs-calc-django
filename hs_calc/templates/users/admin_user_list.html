@@ -1,0 +1,86 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}Список пользователей{% endblock %}
+
+{% block content %}
+<div class="container mt-4 fade-in">
+    <h2 class="mb-4">Управление пользователями</h2>
+
+    <form method="get" class="row g-3 mb-4 align-items-end">
+        <div class="col-md-4">
+            <label for="roleFilter" class="form-label small text-muted">Фильтр по роли</label>
+            <select name="role" id="roleFilter" class="form-select">
+                <option value="">Все роли</option>
+                {% for role_value, role_label in roles %}
+                    <option value="{{ role_value }}" {% if current_role == role_value %}selected{% endif %}>
+                        {{ role_label }}
+                    </option>
+                {% endfor %}
+            </select>
+        </div>
+        <div class="col-md-2">
+            <button type="submit" class="btn btn-primary w-100">Применить</button>
+        </div>
+    </form>
+
+    <div class="card border-0 shadow-sm">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle mb-0">
+                <thead class="table-light">
+                    <tr>
+                        <th>Имя пользователя</th>
+                        <th>Email</th>
+                        <th>Роль</th>
+                        <th>Дата регистрации</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for u in users_list %}
+                        <tr style="cursor: pointer;" onclick="window.location='{% url 'users:admin_user_detail' u.pk %}';">
+                            <td><strong>{{ u.username }}</strong></td>
+                            <td>{{ u.email }}</td>
+                            <td>
+                                {% if u.profile %}
+                                    {{ u.profile.get_role_display }}
+                                {% else %}
+                                    <span class="text-muted">Нет профиля</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ u.date_joined|date:"d.m.Y" }}</td>
+                        </tr>
+                    {% empty %}
+                        <tr>
+                            <td colspan="4" class="text-center text-muted p-4">Пользователи не найдены</td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+    {% if is_paginated %}
+        <nav class="mt-4">
+            <ul class="pagination justify-content-center">
+                {% if page_obj.has_previous %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.previous_page_number }}{% if current_role %}&role={{ current_role }}{% endif %}">&laquo;</a>
+                    </li>
+                {% endif %}
+
+                {% for num in page_obj.paginator.page_range %}
+                    <li class="page-item {% if page_obj.number == num %}active{% endif %}">
+                        <a class="page-link" href="?page={{ num }}{% if current_role %}&role={{ current_role }}{% endif %}">{{ num }}</a>
+                    </li>
+                {% endfor %}
+
+                {% if page_obj.has_next %}
+                    <li class="page-item">
+                        <a class="page-link" href="?page={{ page_obj.next_page_number }}{% if current_role %}&role={{ current_role }}{% endif %}">&raquo;</a>
+                    </li>
+                {% endif %}
+            </ul>
+        </nav>
+    {% endif %}
+</div>
+{% endblock %}

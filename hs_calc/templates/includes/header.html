@@ -1,0 +1,40 @@
+{% load i18n %}
+{% load static %}
+<header>
+  <nav class="shadow navbar navbar-expand-lg navbar-light bg-light">
+    <div class="container-fluid">
+      <a class="navbar-brand" href="{% url "about:home" %}">
+        <img src="{% static 'img/fav/favicon.svg' %}"
+             alt=""
+             width="32"
+             height="32">
+      </a>
+      {% if user.is_authenticated %}
+        {% if user.profile.is_manager or user.profile.is_director %}
+          <a href="{% url "calculate:portal_order" %}" class="btn m-2">Порталы КП</a>
+          <a href="{% url "calculate:glukhar_order" %}" class="btn m-2">Глухари</a>
+        {% endif %}
+        {% if user.profile.is_director %}
+          <a href="{% url "calculate:portal_admin" %}" class="btn m-2">Порталы</a>
+          <a href="{% url "users:admin_user_list" %}" class="btn m-2">Пользователи</a>
+          <a href="{% url "users:register" %}" class="btn m-2">Создать пользователя</a>
+        {% endif %}
+      {% endif %}
+      <div class="justify-content-end collapse navbar-collapse" id="navbarSupportedContent">
+        {% if user.is_authenticated %}
+            <form action="{% url 'users:logout' %}" method="post" class="d-inline">
+                {% csrf_token %}
+                <button type="submit" class="btn btn-primary m-2">
+                    Выйти
+                </button>
+            </form>
+            <a href="{% url "users:profile" %}" class="btn btn-primary m-2">
+                Профиль
+            </a>
+        {% else %}
+            <a href="{% url "users:login" %}" class="btn btn-primary m-2">Войти</a>
+        {% endif %}
+      </div>
+    </div>
+  </nav>
+</header>

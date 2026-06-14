@@ -1,0 +1,22 @@
+.site-footer {
+    background-color: #212529 !important;
+    color: white !important;
+    margin-top: auto;
+    padding: 1rem 0;
+    width: 100%;
+}
+
+.site-footer p {
+    color: white !important;
+    margin: 0;
+}
+
+input::-webkit-outer-spin-button,
+input::-webkit-inner-spin-button {
+    -webkit-appearance: none !important;
+    margin: 0 !important;
+}
+
+input[type="number"] {
+    -moz-appearance: textfield;
+}

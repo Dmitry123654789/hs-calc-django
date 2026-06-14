@@ -1,0 +1,167 @@
+{% extends "base.html" %}
+{% load static %}
+{% block title %}Расчет порталов{% endblock %}
+
+{% block content %}
+<h2 class="mb-4">Расчет порталов</h2>
+<form method="post" id="calculationForm">
+    {% csrf_token %}
+    
+    <div class="row mb-3">
+        <div class="col-md-6">
+            <label for="id_width" class="form-label fw-bold">Ширина (мм)</label>
+            {{ form.width }}
+        </div>
+        <div class="col-md-6">
+            <label for="id_height" class="form-label fw-bold">Высота (мм)</label>
+            {{ form.height }}
+        </div>
+    </div>
+
+    <div class="mb-3">
+        <label class="form-label fw-bold">{{ form.scheme.label }}</label>
+        <div class="row" id="schemesContainer">
+            {% for scheme in schemes %}
+            <div class="col-md-4 col-lg-3 scheme-item mb-3 p-3 border rounded bg-light text-center d-flex flex-column justify-content-center align-items-center" 
+                data-min="{{ scheme.min_size }}" 
+                data-max="{{ scheme.max_size }}"
+                style="transition: all 0.3s ease; min-height: 130px;">
+                
+                {# Изображение схемы (скрыто по умолчанию) #}
+                <img src="{% static 'img/calculate/schemes/' %}{{ scheme.name }}.png" 
+                    alt="Схема {{ scheme.name }}" 
+                    class="scheme-img img-fluid mb-2 d-none" 
+                    style="max-height: 140px; object-fit: contain;"
+                    onerror="this.style.display='none'">
+                
+                {# Блок с радио-кнопкой и текстом #}
+                <div class=" d-flex flex-column align-items-center mt-auto">
+                    <input class=" scheme-radio" 
+                        type="radio" 
+                        name="scheme" 
+                        value="{{ scheme.name }}" 
+                        id="scheme_{{ scheme.id }}" 
+                        disabled>
+                    <label class="form-check-label w-100 mt-1" for="scheme_{{ scheme.id }}">
+                        <strong>{{ scheme.name }}</strong><br>
+                        <small class="text-muted">Размер: {{ scheme.min_size }} – {{ scheme.max_size }} мм</small>
+                    </label>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        
+        <!-- Сообщение-подсказка -->
+        <div class="form-text text-danger mt-2" id="schemeWarning" style="display: none;">
+            ⚠️ Введите ширину портала, чтобы увидеть доступные для выбора схемы.
+        </div>
+        
+        <!-- Вывод ошибок валидации Django, если схема не выбрана -->
+        {{ form.scheme.errors }}
+    </div>
+
+    <div class="mb-3 form-check">
+        {{ form.has_rain }}
+        <label class="form-check-label" for="id_has_rain">Есть ли дождь?</label>
+    </div>
+
+    <div class="row mb-4">
+        <div class="col-md-3">
+            <label class="form-label fw-bold">Цвет</label>
+            {% for radio in form.color %}
+            <div class="form-check">
+                {{ radio.tag }}
+                <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold">Модель ручки</label>
+            {% for radio in form.hardware %}
+            <div class="form-check">
+                {{ radio.tag }}
+                <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold">Стеклопакет</label>
+            {% for radio in form.glazing %}
+            <div class="form-check">
+                {{ radio.tag }}
+                <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="col-md-3">
+            <label class="form-label fw-bold">Тип дерева</label>
+            {% for radio in form.wood_type %}
+            <div class="form-check">
+                {{ radio.tag }}
+                <label class="form-check-label" for="{{ radio.id_for_label }}">{{ radio.choice_label }}</label>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <button type="submit" class="btn btn-primary btn-lg w-100 mt-3">Рассчитать</button>
+</form>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        const widthInput = document.getElementById('id_width');
+        const heightInput = document.getElementById('id_height');
+        const schemeItems = document.querySelectorAll('.scheme-item');
+        const schemeWarning = document.getElementById('schemeWarning');
+
+        function updateSchemes() {
+            const width = parseInt(widthInput.value) || 0;
+
+            if (width === 0) {
+                schemeWarning.style.display = 'block';
+            } else {
+                schemeWarning.style.display = 'none';
+            }
+
+            schemeItems.forEach(item => {
+                const min = parseInt(item.dataset.min);
+                const max = parseInt(item.dataset.max);
+                const radio = item.querySelector('.scheme-radio');
+                const img = item.querySelector('.scheme-img');
+
+                // Проверяем, попадает ли ширина в диапазон схемы
+                if (width >= min && width <= max) {
+                    radio.disabled = false;
+                    // Показываем изображение, убирая класс d-none
+                    if (img) {
+                        img.classList.remove('d-none');
+                        img.style.display = 'initial';
+                    }
+                    // Визуальное выделение доступной схемы (зеленая рамка)
+                    item.classList.remove('opacity-50', 'border-secondary', 'bg-light');
+                    item.classList.add('border-success', 'bg-white', 'shadow-sm');
+                } else {
+                    radio.disabled = true;
+                    radio.checked = false; // Сбрасываем выбор, если схема стала недоступной
+                    // Скрываем изображение
+                    if (img) {
+                        img.classList.add('d-none');
+                        img.style.display = 'none';
+                    }
+                    // Визуальное скрытие недоступной схемы (серый цвет)
+                    item.classList.remove('border-success', 'bg-white', 'shadow-sm');
+                    item.classList.add('opacity-50', 'border-secondary', 'bg-light');
+                }
+            });
+        }
+
+        // Запускаем проверку при загрузке страницы (на случай, если браузер запомнил ввод)
+        updateSchemes();
+
+        // Слушаем изменения в поле ширины
+        widthInput.addEventListener('input', updateSchemes);
+    });
+</script>
+{% endblock %}

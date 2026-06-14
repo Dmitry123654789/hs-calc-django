@@ -1,0 +1,186 @@
+{% extends "base.html" %}
+{% load i18n %}
+
+{% block title %}Регистрация{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center fade-in">
+    <div class="col-md-8 col-lg-6">
+        <div class="content-container p-4 p-md-5">
+            <h2 class="text-center mb-4">Регистрация нового сотрудника</h2>
+
+            <form method="post" class="needs-validation" novalidate>
+                {% csrf_token %}
+
+                {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    <ul class="mb-0">
+                        {% for error in form.non_field_errors %}
+                            <li>{{ error }}</li>
+                        {% endfor %}
+                    </ul>
+                </div>
+                {% endif %}
+
+                <div class="mb-3">
+                    <label for="{{ form.role.id_for_label }}" class="form-label">
+                        Роль
+                    </label>
+                    <select name="{{ form.role.name }}"
+                            id="{{ form.role.id_for_label }}"
+                            class="form-select {% if form.role.errors %}is-invalid{% endif %}"
+                            required>
+                        {% for value, text in form.fields.role.choices %}
+                            <option value="{{ value }}" {% if form.role.value == value %}selected{% endif %}>{{ text }}</option>
+                        {% endfor %}
+                    </select>
+                    {% for error in form.role.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3" id="percentage-sale-wrapper" style="display: none;">
+                    <label for="{{ form.percentage_sale.id_for_label }}" class="form-label">
+                        Процент с продажи (%)
+                    </label>
+                    <input type="number"
+                           name="{{ form.percentage_sale.name }}"
+                           id="{{ form.percentage_sale.id_for_label }}"
+                           class="form-control {% if form.percentage_sale.errors %}is-invalid{% endif %}"
+                           autocomplete="new-percentage_sale"
+                           value="10">
+                    {% for error in form.percentage_sale.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.username.id_for_label }}" class="form-label">
+                        Имя пользователя
+                    </label>
+                    <input type="text"
+                           name="{{ form.username.name }}"
+                           id="{{ form.username.id_for_label }}"
+                           class="form-control {% if form.username.errors %}is-invalid{% endif %}"
+                           value="{{ form.username.value|default:'' }}"
+                           placeholder="Придумайте имя пользователя"
+                           autocomplete="new-username"
+                           required>
+                    {% for error in form.username.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.email.id_for_label }}" class="form-label">
+                        Электронная почта
+                    </label>
+                    <input type="email"
+                           name="{{ form.email.name }}"
+                           id="{{ form.email.id_for_label }}"
+                           class="form-control {% if form.email.errors %}is-invalid{% endif %}"
+                           value="{{ form.email.value|default:'' }}"
+                           placeholder="example@email.com"
+                           required>
+                    {% for error in form.email.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.first_name.id_for_label }}" class="form-label">
+                        Имя_(необязательно)
+                    </label>
+                    <input type="text"
+                           name="{{ form.first_name.name }}"
+                           id="{{ form.first_name.id_for_label }}"
+                           class="form-control {% if form.first_name.errors %}is-invalid{% endif %}"
+                           value="{{ form.first_name.value|default:'' }}"
+                           placeholder="Введите имя">
+                    {% for error in form.first_name.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.last_name.id_for_label }}" class="form-label">
+                        Фамилия (необязательно)
+                    </label>
+                    <input type="text"
+                           name="{{ form.last_name.name }}"
+                           id="{{ form.last_name.id_for_label }}"
+                           class="form-control {% if form.last_name.errors %}is-invalid{% endif %}"
+                           value="{{ form.last_name.value|default:'' }}"
+                           placeholder="Введите_фамилию">
+                    {% for error in form.last_name.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.phone.id_for_label }}" class="form-label">
+                        Телефон (необязательно)
+                    </label>
+                    <input type="tel"
+                           name="{{ form.phone.name }}"
+                           id="{{ form.phone.id_for_label }}"
+                           class="form-control {% if form.phone.errors %}is-invalid{% endif %}"
+                           value="{{ form.phone.value|default:'' }}"
+                           placeholder="+7 (999) 123-45-67">
+                    {% for error in form.phone.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="mb-3">
+                    <label for="{{ form.password1.id_for_label }}" class="form-label">
+                        Пароль
+                    </label>
+                    <input type="password"
+                           name="{{ form.password1.name }}"
+                           id="{{ form.password1.id_for_label }}"
+                           class="form-control {% if form.password1.errors %}is-invalid{% endif %}"
+                           placeholder="Пароль"
+                           autocomplete="new-password"
+                           required>
+                    <div class="form-text">Пароль должен содержать как минимум 8 символов.</div>
+                    {% for error in form.password1.errors %}
+                    <div class="invalid-feedback">{{ error }}</div>
+                    {% endfor %}
+                </div>
+
+                <div class="d-grid gap-2 mb-3">
+                    <button type="submit" class="btn btn-primary btn-lg">
+                        Создать пользователя
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{# Скрипт для динамического переключения видимости поля процента #}
+<script>
+    document.addEventListener('DOMContentLoaded', function () {
+        const roleSelect = document.getElementById('{{ form.role.id_for_label }}');
+        const percentageWrapper = document.getElementById('percentage-sale-wrapper');
+
+        function togglePercentageField() {
+            // 'dealer' — это строковое значение роли GROUP_MANAGER из вашей модели Profile
+            if (roleSelect && roleSelect.value === 'dealer') {
+                percentageWrapper.style.display = 'block';
+            } else if (percentageWrapper) {
+                percentageWrapper.style.display = 'none';
+            }
+        }
+
+        if (roleSelect && percentageWrapper) {
+            roleSelect.addEventListener('change', togglePercentageField);
+            // Запускаем проверку сразу при загрузке страницы (на случай, если форма вернулась с ошибками валидации)
+            togglePercentageField();
+        }
+    });
+</script>
+{% endblock %}

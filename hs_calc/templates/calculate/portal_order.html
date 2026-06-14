@@ -1,0 +1,509 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Формирование заказа порталов{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Формирование заказа порталов</h2>
+
+    <form id="portalForm">
+        {% csrf_token %}
+        
+        <div class="card mb-4 bg-light shadow-sm">
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-12">
+                        <label class="form-label fw-bold">👤 Покупатель:</label>
+                        <select id="buyerSelect" class="form-select">
+                            <option value="null">-- Без покупателя --</option>
+                            <option value="new">+ Новый покупатель</option>
+                        </select>
+                    </div>
+                    
+                    <div class="col-12" id="newBuyerFields" style="display: none;">
+                        <div class="row g-2">
+                            <div class="col-md-3"><input type="text" id="buyerFirstName" class="form-control" placeholder="Имя"></div>
+                            <div class="col-md-3"><input type="text" id="buyerLastName" class="form-control" placeholder="Фамилия"></div>
+                            <div class="col-md-3"><input type="text" id="buyerPhone" class="form-control" placeholder="Телефон"></div>
+                            <div class="col-md-3"><input type="email" id="buyerEmail" class="form-control" placeholder="Email"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="portalContainer" class="row"></div>
+
+        <div class="d-flex flex-wrap gap-3 mt-4 mb-5 align-items-center">
+            <button type="button" class="btn btn-outline-primary" id="addPortalBtn">
+                <i class="bi bi-plus-circle"></i> Добавить портал
+            </button>
+            <div class="ms-auto d-flex gap-3 align-items-center">
+                <button type="submit" class="btn btn-success btn-lg" id="calculateBtn">РАССЧИТАТЬ</button>
+            </div>
+        </div>
+    </form>
+
+    <div id="resultsContainer" class="mt-4"></div>
+</div>
+
+<template id="portalCardTemplate">
+    <div class="col-xl-6 col-12 mb-4 portal-card-wrapper">
+        <div class="card h-100 shadow-sm portal-card border-secondary">
+            <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
+                <span class="fw-bold portal-title">Портал #1</span>
+                <button type="button" class="btn-close btn-close-white remove-portal-btn" aria-label="Удалить" title="Удалить эту позицию"></button>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-5 border-end">
+                        <h6 class="fw-bold text-primary mb-2">⚙️ Размеры и опции</h6>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 fw-semibold">Ширина (мм)</label>
+                            <input type="number" class="form-control form-control-sm p-width" required min="1200" max="15000" value="2000">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 fw-semibold">Высота (мм)</label>
+                            <input type="number" class="form-control form-control-sm p-height" required min="2100" max="3000" value="2100">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 fw-semibold">Количество (шт)</label>
+                            <input type="number" class="form-control form-control-sm p-amount" required min="1" value="1">
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch pt-2">
+                                <input class="form-check-input p-rain" type="checkbox">
+                                <label class="form-check-label small fw-semibold">Защита от дождя</label>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-primary mb-2 pt-2 border-top">🪵 Спецификация</h6>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Тип дерева</label>
+                            <select class="form-select form-select-sm p-wood" required>
+                                <option value="Сосна">Сосна</option>
+                                <option value="Лиственница">Лиственница</option>
+                                <option value="Дуб">Дуб</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Цвет</label>
+                            <select class="form-select form-select-sm p-color" required>
+                                <option value="RAL">RAL</option>
+                                <option value="Лесс">Лесс</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Модель ручки</label>
+                            <select class="form-select form-select-sm p-hardware" required>
+                                <option value="Standard">Односторонняя</option>
+                                <option value="Standard+">Двусторонняя</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Цвет ручки</label>
+                            <select class="form-select form-select-sm p-hardware-color" required>
+                                <option value="white">Белый</option>
+                                <option value="silver">Серебро</option>
+                                <option value="bronze">Бронза</option>
+                                <option value="brown">Коричневый</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Стеклопакет</label>
+                            <select class="form-select form-select-sm p-glazing" required>
+                                <option value="Standard">Standard</option>
+                                <option value="Standard+">Standard+</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <h6 class="fw-bold text-primary mb-2">🪟 Схема открывания</h6>
+                        <div class="p-schemes-container row g-2">
+                            </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+{% endblock %}
+
+{% block scripts %}
+<script>
+    document.addEventListener('DOMContentLoaded', function() {
+        // Получаем массив всех схем из контекста Django
+        const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
+        
+        const container = document.getElementById('portalContainer');
+        const template = document.getElementById('portalCardTemplate');
+        const addBtn = document.getElementById('addPortalBtn');
+        const form = document.getElementById('portalForm');
+        const resultContainer = document.getElementById('resultsContainer');
+        const buyerSelect = document.getElementById('buyerSelect');
+        const newBuyerFields = document.getElementById('newBuyerFields');
+        
+        let portalIdCounter = 0;
+        let lastPayload = null;
+        let baseTotalPrice = 0;
+        let totalArea = 0;
+
+        function showAlert(message, type = 'danger') {
+            document.querySelectorAll('.custom-alert').forEach(el => el.remove());
+            const alertDiv = document.createElement('div');
+            alertDiv.className = `alert alert-${type} mt-4 custom-alert alert-dismissible fade show shadow-sm`;
+            alertDiv.innerHTML = `<strong>${type === 'danger' ? 'Ошибка!' : 'Внимание!'}</strong> ${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').children[1]);
+        }
+
+        // Загрузка покупателей
+        fetch('{% url "users:buyers_list" %}')
+            .then(res => res.json())
+            .then(buyers => {
+                buyers.forEach(b => {
+                    const opt = document.createElement('option');
+                    opt.value = b.id;
+                    opt.textContent = `${b.first_name || 'Без имени'} ${b.last_name || ''} (${b.phone || b.email || 'Нет контактов'})`;
+                    buyerSelect.appendChild(opt);
+                });
+            });
+
+        buyerSelect.addEventListener('change', function() {
+            newBuyerFields.style.display = this.value === 'new' ? 'block' : 'none';
+        });
+
+        // Функция обновления доступности схем внутри конкретной карточки
+        function updateCardSchemesAvailability(cardWrapper) {
+            const widthInput = cardWrapper.querySelector('.p-width');
+            const width = parseInt(widthInput.value) || 0;
+            const items = cardWrapper.querySelectorAll('.scheme-item');
+
+            items.forEach(item => {
+                const min = parseInt(item.getAttribute('data-min'));
+                const max = parseInt(item.getAttribute('data-max'));
+                const radio = item.querySelector('.scheme-radio');
+
+                if (width >= min && width <= max) {
+                    // Разрешено к выбору
+                    radio.disabled = false;
+                    item.classList.remove('opacity-50', 'bg-light', 'border-secondary');
+                    if (radio.checked) {
+                        item.classList.add('border-success', 'bg-white', 'shadow-sm');
+                    } else {
+                        item.classList.add('border-dark');
+                        item.classList.remove('border-success', 'shadow-sm');
+                    }
+                    item.style.pointerEvents = 'auto';
+                } else {
+                    // Запрещено к выбору (Видно, но readonly)
+                    radio.disabled = true;
+                    if (radio.checked) {
+                        radio.checked = false; // сбрасываем выбор, если стал недоступен
+                    }
+                    item.classList.remove('border-success', 'border-dark', 'shadow-sm');
+                    item.classList.add('opacity-50', 'bg-light', 'border-secondary');
+                    item.style.pointerEvents = 'none'; // Отключаем клики по блоку
+                }
+            });
+        }
+
+        // Отрисовка рамки вокруг выбранной радиокнопки схемы
+        function updateSchemeVisualSelection(cardWrapper) {
+            const items = cardWrapper.querySelectorAll('.scheme-item');
+            items.forEach(item => {
+                const radio = item.querySelector('.scheme-radio');
+                if (!radio.disabled) {
+                    if (radio.checked) {
+                        item.classList.remove('border-dark');
+                        item.classList.add('border-success', 'shadow-sm', 'bg-white');
+                    } else {
+                        item.classList.remove('border-success', 'shadow-sm');
+                        item.classList.add('border-dark');
+                    }
+                }
+            });
+        }
+
+        // Функция добавления новой карточки портала
+        function addPortalCard() {
+            portalIdCounter++;
+            const clone = template.content.cloneNode(true);
+            const cardWrapper = clone.querySelector('.portal-card-wrapper');
+            
+            // Уникальный ID для группировки радиокнопок схем внутри этой карточки
+            const currentCardIndex = portalIdCounter;
+            
+            cardWrapper.querySelector('.portal-title').textContent = `Портал #${currentCardIndex}`;
+            
+            // Навешиваем удаление карточки
+            cardWrapper.querySelector('.remove-portal-btn').addEventListener('click', function() {
+                cardWrapper.remove();
+                renumberCards();
+            });
+
+            // Генерация сетки всех схем внутри карточки
+            const schemesContainer = cardWrapper.querySelector('.p-schemes-container');
+            schemesData.forEach(scheme => {
+                const schemeItem = document.createElement('div');
+                schemeItem.className = 'col-sm-6 scheme-item p-2 border rounded text-center d-flex flex-column justify-content-center align-items-center position-relative border-dark';
+                schemeItem.setAttribute('data-min', scheme.min_size);
+                schemeItem.setAttribute('data-max', scheme.max_size);
+                schemeItem.style.transition = 'all 0.2s ease';
+                schemeItem.style.cursor = 'pointer';
+                schemeItem.style.minHeight = '75px';
+
+                schemeItem.innerHTML = `
+                    <input type="radio" name="scheme_radio_${currentCardIndex}" value="${scheme.name}" class="form-check-input scheme-radio position-absolute top-0 start-0 m-2" required>
+                    <span class="fw-bold small text-dark">Схема ${scheme.name}</span>
+                    <span class="text-muted" style="font-size: 0.75rem;">${scheme.min_size} - ${scheme.max_size} мм</span>
+                `;
+
+                // Обработчик клика по блоку схемы
+                schemeItem.addEventListener('click', function() {
+                    const radio = schemeItem.querySelector('.scheme-radio');
+                    if (!radio.disabled) {
+                        radio.checked = true;
+                        updateSchemeVisualSelection(cardWrapper);
+                    }
+                });
+
+                schemesContainer.appendChild(schemeItem);
+            });
+
+            // Слушатель изменения ширины для пересчета доступности схем
+            const widthInput = cardWrapper.querySelector('.p-width');
+            widthInput.addEventListener('input', () => updateCardSchemesAvailability(cardWrapper));
+            
+            container.appendChild(cardWrapper);
+            
+            // Первичный расчет доступности схем для дефолтных значений
+            updateCardSchemesAvailability(cardWrapper);
+        }
+
+        function renumberCards() {
+            const cards = container.querySelectorAll('.portal-card-wrapper');
+            cards.forEach((card, index) => {
+                card.querySelector('.portal-title').textContent = `Портал #${index + 1}`;
+            });
+        }
+
+        // Добавляем первый портал при загрузке
+        addPortalCard();
+        addBtn.addEventListener('click', addPortalCard);
+
+        // Отправка формы на расчет
+        form.addEventListener('submit', function(e) {
+            e.preventDefault();
+
+            const cards = container.querySelectorAll('.portal-card-wrapper');
+            if (cards.length === 0) {
+                showAlert('Добавьте хотя бы один портал для расчета.', 'warning');
+                return;
+            }
+
+            const payload = {
+                portals: []
+            };
+
+            let isValid = true;
+            totalArea = 0;
+
+            cards.forEach((card) => {
+                const width = parseFloat(card.querySelector('.p-width').value);
+                const height = parseFloat(card.querySelector('.p-height').value);
+                const amount = parseInt(card.querySelector('.p-amount').value);
+                const hasRain = card.querySelector('.p-rain').checked;
+                
+                const wood_type = card.querySelector('.p-wood').value;
+                const color = card.querySelector('.p-color').value;
+                const hardware = card.querySelector('.p-hardware').value;
+                const hardwareColor = card.querySelector('.p-hardware-color').value;
+                const glazing = card.querySelector('.p-glazing').value;
+
+                // Находим выбранную схему в данной карточке
+                const selectedSchemeRadio = card.querySelector('.scheme-radio:checked');
+                
+                if (!selectedSchemeRadio) {
+                    isValid = false;
+                    return;
+                }
+
+                payload.portals.push({
+                    width: width,
+                    height: height,
+                    amount: amount,
+                    has_rain: hasRain,
+                    wood_type: wood_type,
+                    color: color,
+                    hardware: hardware,
+                    hardware_color: hardwareColor,
+                    glazing: glazing,
+                    scheme: selectedSchemeRadio.value
+                });
+
+                totalArea += (width * height / 1000000) * amount;
+            });
+
+            if (!isValid) {
+                showAlert('Пожалуйста, выберите схему открывания для каждого добавленного портала.');
+                return;
+            }
+
+            lastPayload = payload;
+            resultContainer.innerHTML = `<div class="text-center mt-4"><div class="spinner-border text-primary"></div><p class="mt-2">Выполняется расчет позиций...</p></div>`;
+
+            // Запрос к API расчета
+            fetch('{% url "calculate:portal_order_calculate" %}', { 
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                body: JSON.stringify(payload)
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                displayResults(data);
+            })
+            .catch(error => {
+                resultContainer.innerHTML = '';
+                showAlert(`Ошибка выполнения расчета: ${error.message}`);
+            });
+        });
+
+        function displayResults(data) {
+            let html = '<h3 class="mb-3 border-bottom pb-2 mt-5">📊 Результаты пакетного расчета</h3>';
+            baseTotalPrice = data.total_portals_price || 0;
+
+            // Генерируем карточки для каждого портала
+            let cardsHtml = '<div class="row g-3 mb-4">';
+            data.results.forEach(p => {
+                // Обрабатываем чекбокс для скрытой формы
+                let hasRainInput = p.has_rain ? '<input type="hidden" name="has_rain" value="on">' : '';
+                
+                cardsHtml += `
+                <div class="col-md-6 col-lg-4">
+                    <div class="card h-100 shadow-sm border-secondary">
+                        <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
+                            <span>Портал #${p.id}</span>
+                            <span class="badge bg-primary">x${p.amount} шт.</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-bordered mb-0 text-center align-middle">
+                                <tbody>
+                                    <tr><td class="text-start ps-1 fw-semibold">Площадь</td><td>${p.width * p.height / 1000000 * p.amount} м²</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-3">ИТОГО за позицию</td><td>${p.portal_total.toLocaleString('ru-RU', {minimumFractionDigits: 2})}</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            cardsHtml += '</div>';
+
+            html += cardsHtml;
+
+            // Дополнительные параметры заказа (Полная копия структуры из Glukhar)
+            html += `
+            <div class="card mb-4 bg-light shadow-sm border-secondary">
+                <div class="card-body">
+                    <h5 class="card-title fw-bold mb-3 text-dark">🚚 Дополнительные параметры заказа</h5>
+                    <div class="row g-3">
+                        <div class="col-lg col-md-4">
+                            <label class="form-label fw-bold small">Монтаж (руб/м²)</label>
+                            <input type="number" class="form-control cost-input" id="installRate" min="0" value="12000">
+                        </div>
+                        <div class="col-lg col-md-4">
+                            <label class="form-label fw-bold small">Доставка (руб)</label>
+                            <input type="number" class="form-control cost-input" id="deliveryCost" min="0" value="50000">
+                        </div>
+                        <div class="col-lg col-md-4">
+                            <label class="form-label fw-bold small">Разгрузка (руб)</label>
+                            <input type="number" class="form-control cost-input" id="unloadingCost" min="0" value="50000">
+                        </div>
+                        <div class="col-lg col-md-6">
+                            <label class="form-label fw-bold small">Наценка</label>
+                            <div class="form-control bg-white fw-bold" id="profitRatio">${data.profit_ratio || '1.0'}</div>
+                        </div>
+                        <div class="col-lg col-md-6">
+                            <label class="form-label fw-bold text-danger small">Скидка (руб)</label>
+                            <input type="number" class="form-control cost-input" id="discountRate" min="0" value="0">
+                        </div>
+                    </div>
+                    <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0 border-dark shadow-sm text-uppercase" id="dynamicGrandTotal">
+                        Итого с учетом доп. услуг: 0.00 руб.
+                    </div>
+                </div>
+            </div>`;
+            
+            html += `<div class="d-flex flex-wrap gap-2 mb-5">
+                <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">💾 Сохранить спецификацию заказа</button>
+            </div>`;
+
+            resultContainer.innerHTML = html;
+
+            document.querySelectorAll('.cost-input').forEach(inp => inp.addEventListener('input', recalculateGrandTotal));
+            recalculateGrandTotal();
+
+            document.getElementById('saveOrderBtn').onclick = function() {
+                saveOrder(this);
+            };
+        }
+
+        function recalculateGrandTotal() {
+            const installRate = parseFloat(document.getElementById('installRate').value) || 0;
+            const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
+            const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
+            const ratio = parseFloat(document.getElementById('profitRatio').textContent) || 1.0;
+            const discount = parseFloat(document.getElementById('discountRate').value) || 0;
+
+            const finalTotal = (baseTotalPrice * ratio) + (totalArea * installRate) + delivery + unloading - discount;
+            document.getElementById('dynamicGrandTotal').textContent = `Итого с учетом доп. услуг: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
+        }
+
+        async function saveOrder(btnElement) {
+            if (!lastPayload) return;
+            const payload = { ...lastPayload };
+            payload.buyer_id = buyerSelect.value;
+            payload.installation = parseFloat(document.getElementById('installRate').value) || 0;
+            payload.delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
+            payload.unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
+            payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
+            
+            if (payload.buyer_id === 'new') {
+                payload.buyer_data = {
+                    first_name: document.getElementById('buyerFirstName').value,
+                    last_name: document.getElementById('buyerLastName').value,
+                    phone: document.getElementById('buyerPhone').value,
+                    email: document.getElementById('buyerEmail').value
+                };
+            }
+            
+            btnElement.disabled = true;
+            btnElement.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+
+            try {
+                const response = await fetch('{% url "calculate:portal_order_save" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
+                    body: JSON.stringify(payload)
+                });
+                const data = await response.json();
+                if (data.status === 'success') {
+                    showAlert(`Заказ успешно сохранен в базу данных!`, 'success');
+                    btnElement.innerHTML = 'Заказ успешно сохранен';
+                    btnElement.classList.replace('btn-primary', 'btn-secondary');
+                } else {
+                    showAlert('Ошибка при сохранении: ' + data.error);
+                    btnElement.disabled = false;
+                    btnElement.innerHTML = '💾 Сохранить спецификацию заказа';
+                }
+            } catch (err) {
+                showAlert('Ошибка сети/соединения: ' + err.message);
+                btnElement.disabled = false;
+                btnElement.innerHTML = '💾 Сохранить спецификацию заказа';
+            }
+        }
+    });
+</script>
+{% endblock %}
