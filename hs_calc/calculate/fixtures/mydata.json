@@ -1,0 +1,558 @@
+[
+{
+  "model": "calculate.scheme",
+  "pk": 1,
+  "fields": {
+    "name": "scheme_A",
+    "min_size": 1200,
+    "max_size": 5000,
+    "door": 1,
+    "fixed_sash": 1,
+    "rail_amour": 1,
+    "door_sub": 149,
+    "sash_sub": 60
+  }
+},
+{
+  "model": "calculate.scheme",
+  "pk": 2,
+  "fields": {
+    "name": "scheme_C",
+    "min_size": 2500,
+    "max_size": 10000,
+    "door": 2,
+    "fixed_sash": 2,
+    "rail_amour": 1,
+    "door_sub": 131,
+    "sash_sub": 42
+  }
+},
+{
+  "model": "calculate.scheme",
+  "pk": 3,
+  "fields": {
+    "name": "scheme_G",
+    "min_size": 1800,
+    "max_size": 7500,
+    "door": 1,
+    "fixed_sash": 2,
+    "rail_amour": 1,
+    "door_sub": 195,
+    "sash_sub": 57
+  }
+},
+{
+  "model": "calculate.scheme",
+  "pk": 4,
+  "fields": {
+    "name": "scheme_E",
+    "min_size": 1800,
+    "max_size": 7500,
+    "door": 2,
+    "fixed_sash": 1,
+    "rail_amour": 2,
+    "door_sub": 122,
+    "sash_sub": 33
+  }
+},
+{
+  "model": "calculate.scheme",
+  "pk": 5,
+  "fields": {
+    "name": "scheme_L",
+    "min_size": 3600,
+    "max_size": 15000,
+    "door": 4,
+    "fixed_sash": 2,
+    "rail_amour": 2,
+    "door_sub": 110,
+    "sash_sub": 25
+  }
+},
+{
+  "model": "calculate.glass",
+  "pk": 1,
+  "fields": {
+    "name": "Standard",
+    "price": 9500
+  }
+},
+{
+  "model": "calculate.glass",
+  "pk": 2,
+  "fields": {
+    "name": "Standard+",
+    "price": 13500
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 1,
+  "fields": {
+    "name": "1К",
+    "price": 383,
+    "length": 3,
+    "identity": "Брусок 38*180"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 2,
+  "fields": {
+    "name": "2",
+    "price": 520,
+    "length": 3,
+    "identity": "Брус"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 3,
+  "fields": {
+    "name": "3К",
+    "price": 63,
+    "length": 3,
+    "identity": "Брусок  42*14"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 4,
+  "fields": {
+    "name": "4К",
+    "price": 111,
+    "length": 3,
+    "identity": "Брусок 36*40"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 5,
+  "fields": {
+    "name": "5К",
+    "price": 111,
+    "length": 3,
+    "identity": "Брусок 36*40"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 6,
+  "fields": {
+    "name": "6К",
+    "price": 211,
+    "length": 3,
+    "identity": "Брусок 36*80"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 7,
+  "fields": {
+    "name": "7К",
+    "price": 211,
+    "length": 3,
+    "identity": "Брусок 36*80"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 8,
+  "fields": {
+    "name": "8К",
+    "price": 232,
+    "length": 3,
+    "identity": "Брусок 34*104"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 9,
+  "fields": {
+    "name": "10К",
+    "price": 111,
+    "length": 3,
+    "identity": "Брусок 36*40"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 10,
+  "fields": {
+    "name": "11К",
+    "price": 95,
+    "length": 6,
+    "identity": "Брусок 23*70"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 11,
+  "fields": {
+    "name": "12С",
+    "price": 520,
+    "length": 1,
+    "identity": "створка низ"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 12,
+  "fields": {
+    "name": "13С",
+    "price": 670,
+    "length": 1,
+    "identity": "створка верх"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 13,
+  "fields": {
+    "name": "9С",
+    "price": 20,
+    "length": 3,
+    "identity": "Штапик"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 14,
+  "fields": {
+    "name": "14С",
+    "price": 100,
+    "length": 3,
+    "identity": "Г-образка"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 15,
+  "fields": {
+    "name": "ЮП-968",
+    "price": 263,
+    "length": 1,
+    "identity": "Нижняя рельса"
+  }
+},
+{
+  "model": "calculate.beams",
+  "pk": 16,
+  "fields": {
+    "name": "ЮП-969",
+    "price": 477,
+    "length": 1,
+    "identity": "Верхняя рельса"
+  }
+},
+{
+  "model": "calculate.glukharwood",
+  "pk": 1,
+  "fields": {
+    "name": "сосна",
+    "price": 790,
+    "length": 6
+  }
+},
+{
+  "model": "calculate.glukharwood",
+  "pk": 2,
+  "fields": {
+    "name": "дуб",
+    "price": 2370,
+    "length": 6
+  }
+},
+{
+  "model": "calculate.glukharwood",
+  "pk": 3,
+  "fields": {
+    "name": "лиственница",
+    "price": 1580,
+    "length": 6
+  }
+},
+{
+  "model": "calculate.hardware",
+  "pk": 1,
+  "fields": {
+    "name": "Standard",
+    "price": 39500,
+    "length": 2600
+  }
+},
+{
+  "model": "calculate.hardware",
+  "pk": 2,
+  "fields": {
+    "name": "Standard+",
+    "price": 53500,
+    "length": 3000
+  }
+},
+{
+  "model": "calculate.glukharglass",
+  "pk": 1,
+  "fields": {
+    "name": "",
+    "price": 9500,
+    "min_area": 0,
+    "max_area": 4
+  }
+},
+{
+  "model": "calculate.glukharglass",
+  "pk": 2,
+  "fields": {
+    "name": "",
+    "price": 10500,
+    "min_area": 4,
+    "max_area": 5
+  }
+},
+{
+  "model": "calculate.glukharglass",
+  "pk": 3,
+  "fields": {
+    "name": "",
+    "price": 13500,
+    "min_area": 5,
+    "max_area": 10
+  }
+},
+{
+  "model": "calculate.color",
+  "pk": 1,
+  "fields": {
+    "name": "RAL-эмаль",
+    "price": 1500,
+    "coverage_rate_doors": "1.20",
+    "coverage_rate_sash": "0.80"
+  }
+},
+{
+  "model": "calculate.color",
+  "pk": 2,
+  "fields": {
+    "name": "RAL-грунт",
+    "price": 1300,
+    "coverage_rate_doors": "0.67",
+    "coverage_rate_sash": "0.44"
+  }
+},
+{
+  "model": "calculate.color",
+  "pk": 3,
+  "fields": {
+    "name": "Лесс-лак",
+    "price": 1800,
+    "coverage_rate_doors": "1.20",
+    "coverage_rate_sash": "0.80"
+  }
+},
+{
+  "model": "calculate.color",
+  "pk": 4,
+  "fields": {
+    "name": "Лесс-грунт",
+    "price": 850,
+    "coverage_rate_doors": "0.67",
+    "coverage_rate_sash": "0.44"
+  }
+},
+{
+  "model": "calculate.color",
+  "pk": 7,
+  "fields": {
+    "name": "RAL",
+    "price": 0,
+    "coverage_rate_doors": "0.00",
+    "coverage_rate_sash": "0.00"
+  }
+},
+{
+  "model": "calculate.color",
+  "pk": 8,
+  "fields": {
+    "name": "Лесс",
+    "price": 0,
+    "coverage_rate_doors": "0.00",
+    "coverage_rate_sash": "0.00"
+  }
+},
+{
+  "model": "calculate.portalwood",
+  "pk": 1,
+  "fields": {
+    "name": "сосна",
+    "ratio": "1.00"
+  }
+},
+{
+  "model": "calculate.portalwood",
+  "pk": 2,
+  "fields": {
+    "name": "лиственница",
+    "ratio": "1.12"
+  }
+},
+{
+  "model": "calculate.portalwood",
+  "pk": 3,
+  "fields": {
+    "name": "дуб",
+    "ratio": "1.22"
+  }
+},
+{
+  "model": "calculate.profitratio",
+  "pk": 1,
+  "fields": {
+    "name": "portal",
+    "ratio": "2.40"
+  }
+},
+{
+  "model": "calculate.profitratio",
+  "pk": 2,
+  "fields": {
+    "name": "glukhar",
+    "ratio": "1.50"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 1,
+  "fields": {
+    "beam": "1К",
+    "carpenter": "333.33",
+    "painter": "250.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 2,
+  "fields": {
+    "beam": "2",
+    "carpenter": "500.00",
+    "painter": "500.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 3,
+  "fields": {
+    "beam": "3К",
+    "carpenter": "333.33",
+    "painter": "200.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 4,
+  "fields": {
+    "beam": "4К",
+    "carpenter": "166.67",
+    "painter": "200.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 5,
+  "fields": {
+    "beam": "5К",
+    "carpenter": "166.67",
+    "painter": "200.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 6,
+  "fields": {
+    "beam": "6К",
+    "carpenter": "166.67",
+    "painter": "200.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 7,
+  "fields": {
+    "beam": "7К",
+    "carpenter": "166.67",
+    "painter": "200.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 8,
+  "fields": {
+    "beam": "8К",
+    "carpenter": "166.67",
+    "painter": "200.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 9,
+  "fields": {
+    "beam": "9С",
+    "carpenter": "0.00",
+    "painter": "0.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 10,
+  "fields": {
+    "beam": "10К",
+    "carpenter": "166.67",
+    "painter": "200.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 11,
+  "fields": {
+    "beam": "11К",
+    "carpenter": "333.33",
+    "painter": "250.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 12,
+  "fields": {
+    "beam": "14С",
+    "carpenter": "166.67",
+    "painter": "200.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 13,
+  "fields": {
+    "beam": "lock",
+    "carpenter": "1500.00",
+    "painter": "0.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 14,
+  "fields": {
+    "beam": "package",
+    "carpenter": "1250.00",
+    "painter": "0.00"
+  }
+},
+{
+  "model": "calculate.work",
+  "pk": 15,
+  "fields": {
+    "beam": "door",
+    "carpenter": "1000.00",
+    "painter": "1000.00"
+  }
+}
+]

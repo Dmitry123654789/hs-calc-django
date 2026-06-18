@@ -9,12 +9,12 @@ env = environ.Env()
 environ.Env.read_env("../.env")
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = env("DJANGO_SECRET_KEY", default="fake")
+SECRET_KEY = env.str("DJANGO_SECRET_KEY", default="fake")
 
 # SECURITY WARNING: don"t run with debug turned on in production!
 DEBUG = env.bool("DJANGO_DEBUG", default=False)
 
-ALLOWED_HOSTS = env(
+ALLOWED_HOSTS = env.list(
     "DJANGO_ALLOWED_HOSTS",
     default=[
         "localhost",
@@ -22,7 +22,6 @@ ALLOWED_HOSTS = env(
         "::1",
     ],
 )
-
 # Application definition
 
 INSTALLED_APPS = [
@@ -111,8 +110,11 @@ STATICFILES_DIRS = [
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 
-
 if DEBUG:
+    DEBUG_TOOLBAR_CONFIG = {
+        "SHOW_TOOLBAR_CALLBACK": lambda x: True,
+    }
+
     INSTALLED_APPS = [
         *INSTALLED_APPS,
         "debug_toolbar",

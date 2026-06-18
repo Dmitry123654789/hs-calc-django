@@ -134,6 +134,7 @@ class BuyerListView(
     django.views.generic.View,
 ):
     """API для получения списка существующих покупателей"""
+
     def get(self, request, *args, **kwargs):
         buyers = users.models.Buyer.objects.all().values(
             "id",

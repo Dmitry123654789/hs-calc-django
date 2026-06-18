@@ -1,0 +1,30 @@
+[
+{
+  "model": "users.customuser",
+  "pk": 3,
+  "fields": {
+    "password": "pbkdf2_sha256$1000000$WcMVmRlKAtAkcGJf9rcniE$WqK9EfDz25jULYo9ok3RbIAGN1jy/+LSqFakPP2uG28=",
+    "last_login": "2026-06-17T14:42:39.619Z",
+    "is_superuser": false,
+    "username": "admin",
+    "first_name": "",
+    "last_name": "",
+    "is_staff": false,
+    "is_active": true,
+    "date_joined": "2026-06-17T14:42:32.313Z",
+    "email": "admin@admin.admin",
+    "groups": [],
+    "user_permissions": []
+  }
+},
+{
+  "model": "users.profile",
+  "pk": 3,
+  "fields": {
+    "user": 3,
+    "role": "admin",
+    "phone": "",
+    "percentage_sale": null
+  }
+}
+]

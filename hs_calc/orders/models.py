@@ -1,35 +1,43 @@
-import django.db.models
+from django.db.models import (
+    CASCADE,
+    DateTimeField,
+    DecimalField,
+    ForeignKey,
+    Model,
+    PositiveIntegerField,
+    SET_NULL,
+)
 
 import users.models
 
 
-class Order(django.db.models.Model):
-    delivery = django.db.models.PositiveIntegerField(
+class Order(Model):
+    delivery = PositiveIntegerField(
         default=False,
         verbose_name="Доставка",
     )
-    installation = django.db.models.PositiveIntegerField(
+    installation = PositiveIntegerField(
         default=False,
         verbose_name="Монтаж",
     )
-    unloading = django.db.models.PositiveIntegerField(
+    unloading = PositiveIntegerField(
         default=False,
         verbose_name="Разгрузка",
     )
-    discount = django.db.models.DecimalField(
+    discount = DecimalField(
         max_digits=10,
         decimal_places=2,
         default=0,
         verbose_name="Скидка",
     )
-    dealer = django.db.models.ForeignKey(
+    dealer = ForeignKey(
         users.models.CustomUser,
-        on_delete=django.db.models.CASCADE,
+        on_delete=CASCADE,
     )
-    buyer = django.db.models.ForeignKey(
+    buyer = ForeignKey(
         users.models.Buyer,
-        on_delete=django.db.models.SET_NULL,
+        on_delete=SET_NULL,
         null=True,
         blank=True,
     )
-    created_at = django.db.models.DateTimeField(auto_now_add=True)
+    created_at = DateTimeField(auto_now_add=True)

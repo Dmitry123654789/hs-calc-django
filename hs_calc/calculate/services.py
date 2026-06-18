@@ -495,14 +495,17 @@ def summ_work(data):
 
 
 def calculate_beams(
-    portal_width: int,
-    portal_height: int,
+    name: str,
+    width: int,
+    height: int,
     has_rain: bool,
     hardware: str,
     color: str,
-    glass_type: str,
-    schemes: list,
+    glazing: str,
+    scheme: str,
     wood_type: str,
+    amount: int,
+    **kwargs,
 ):
     try:
         wood_obj = PortalWood.objects.get(name=wood_type.lower())
@@ -525,93 +528,115 @@ def calculate_beams(
         "14С",
     ]
 
-    workpiece = {scheme: {} for scheme in schemes}
-    work_data = {scheme: [] for scheme in schemes}
+    workpiece = {scheme: {}}
+    work_data = {scheme: []}
 
-    for scheme in schemes:
-        amount_w, amount_h = amount_k1(portal_width, portal_height)
-        workpiece[scheme]["1К"] = {
-            "price": get_price_k1(amount_w, amount_h),
-            "w_list": amount_w,
-            "h_list": amount_h,
-        }
-        workpiece[scheme]["2"] = {
-            "price": get_price_2(scheme),
-            "h_list": {portal_height: amount_2(scheme)},
-        }
-        workpiece[scheme]["3К"] = {
-            "price": get_price_3k(portal_height),
-            "h_list": {portal_height: 2},
-        }
+    amount_w, amount_h = amount_k1(width, height)
+    workpiece[scheme]["1К"] = {
+        "price": get_price_k1(amount_w, amount_h),
+        "w_list": amount_w,
+        "h_list": amount_h,
+    }
+    workpiece[scheme]["2"] = {
+        "price": get_price_2(scheme),
+        "h_list": {height: amount_2(scheme)},
+    }
+    workpiece[scheme]["3К"] = {
+        "price": get_price_3k(height),
+        "h_list": {height: 2},
+    }
 
-        if has_rain:
-            dict_4k = get_price_4k(has_rain, portal_width, scheme)
-            workpiece[scheme]["4К"] = {
-                "price": dict_4k["price"],
-                "w_list": {dict_4k["w_list"]: get_fixed_sash_amount(scheme)},
-            }
-        else:
-            workpiece[scheme]["4К"] = {"price": 0, "w_list": {0: 0}}
+    if has_rain:
+        dict_4k = get_price_4k(has_rain, width, scheme)
+        workpiece[scheme]["4К"] = {
+            "price": dict_4k["price"],
+            "w_list": {dict_4k["w_list"]: get_fixed_sash_amount(scheme)},
+        }
+    else:
+        workpiece[scheme]["4К"] = {"price": 0, "w_list": {0: 0}}
 
-        workpiece[scheme]["5К"] = get_price_5k(
-            has_rain,
-            portal_width,
-            portal_height,
-            scheme,
+    workpiece[scheme]["5К"] = get_price_5k(
+        has_rain,
+        width,
+        height,
+        scheme,
+    )
+    workpiece[scheme]["6К"] = get_price_6k(has_rain, width, scheme)
+    workpiece[scheme]["7К"] = get_price_7k(
+        has_rain,
+        width,
+        height,
+        scheme,
+    )
+    workpiece[scheme]["8К"] = get_price_8k(width, scheme)
+    workpiece[scheme]["9С"] = get_price_9c(width, height, scheme)
+    workpiece[scheme]["10К"] = get_price_8k(width, scheme, beam_id="10К")
+    workpiece[scheme]["11К"] = get_price_11k(width)
+    workpiece[scheme]["12С"] = get_price_12c(width, height, scheme)
+    workpiece[scheme]["13С"] = get_price_13c(width, scheme)
+    workpiece[scheme]["14С"] = get_price_14c(height, scheme)
+    workpiece[scheme]["ЮП-968"] = get_rails_price(width, scheme, "ЮП-968")
+    workpiece[scheme]["ЮП-969"] = get_rails_price(width, scheme, "ЮП-969")
+    workpiece[scheme]["Фурнитура"] = calculate_hardware(scheme, hardware)
+
+    name_dict = {
+        "RAL": ["RAL-эмаль", "RAL-грунт"],
+        "Лесс": ["Лесс-лак", "Лесс-грунт"],
+    }
+    color_data = calculate_color(color, scheme, width, height)
+    for name in name_dict[color]:
+        workpiece[scheme][name] = color_data[name]
+
+    glass_data = calculate_glass(scheme, glazing, width, height)
+    workpiece[scheme]["Стеклопакет створка"] = glass_data["doors"]
+    workpiece[scheme]["Стеклопакет глухарь"] = glass_data["sashes"]
+
+    for beam_name in target_beams:
+        if beam_name in workpiece[scheme]:
+            item = workpiece[scheme][beam_name]
+            if isinstance(item, dict) and "price" in item:
+                item["price"] = round(item["price"] * wood_ratio, 2)
+            elif isinstance(item, (int, float)):
+                workpiece[scheme][beam_name] = round(item * wood_ratio, 2)
+
+    calculated_work = calculate_work(workpiece, width, height)[scheme]
+    work_data[scheme] = calculated_work
+    work_result = summ_work(calculated_work)
+    workpiece[scheme]["Работа столяр"] = {
+        "price": work_result["столяр"],
+        "w_list": {"-": "-"},
+    }
+    workpiece[scheme]["Работа маляр"] = {
+        "price": work_result["маляр"],
+        "w_list": {"-": "-"},
+    }
+
+    portal_total = (
+        sum(
+            v["price"] if isinstance(v, dict) and "price" in v else 0
+            for v in workpiece[scheme].values()
         )
-        workpiece[scheme]["6К"] = get_price_6k(has_rain, portal_width, scheme)
-        workpiece[scheme]["7К"] = get_price_7k(
-            has_rain,
-            portal_width,
-            portal_height,
-            scheme,
-        )
-        workpiece[scheme]["8К"] = get_price_8k(portal_width, scheme)
-        workpiece[scheme]["9С"] = get_price_9c(portal_width, portal_height, scheme)
-        workpiece[scheme]["10К"] = get_price_8k(portal_width, scheme, beam_id="10К")
-        workpiece[scheme]["11К"] = get_price_11k(portal_width)
-        workpiece[scheme]["12С"] = get_price_12c(portal_width, portal_height, scheme)
-        workpiece[scheme]["13С"] = get_price_13c(portal_width, scheme)
-        workpiece[scheme]["14С"] = get_price_14c(portal_height, scheme)
-        workpiece[scheme]["ЮП-968"] = get_rails_price(portal_width, scheme, "ЮП-968")
-        workpiece[scheme]["ЮП-969"] = get_rails_price(portal_width, scheme, "ЮП-969")
-        workpiece[scheme]["Фурнитура"] = calculate_hardware(scheme, hardware)
+        * amount
+    )
 
-        name_dict = {
-            "RAL": ["RAL-эмаль", "RAL-грунт"],
-            "Лесс": ["Лесс-лак", "Лесс-грунт"],
+    return workpiece, work_data, portal_total
+
+
+def calculate_portals(portals: list) -> dict:
+    result = {}
+    total_price = 0
+
+    for portal in portals:
+        workpiece, work_data, portal_total = calculate_beams(**portal)
+        result[portal["name"]] = {
+            "workpiece": workpiece,
+            "work_data": work_data,
+            "portal_total": portal_total,
         }
-        data = calculate_color(color, scheme, portal_width, portal_height)
-        for name in name_dict[color]:
-            workpiece[scheme][name] = data[name]
+        total_price += portal_total
 
-        glass_data = calculate_glass(scheme, glass_type, portal_width, portal_height)
-        workpiece[scheme]["Стеклопакет створка"] = glass_data["doors"]
-        workpiece[scheme]["Стеклопакет глухарь"] = glass_data["sashes"]
-
-    for scheme in schemes:
-        for beam_name in target_beams:
-            if beam_name in workpiece[scheme]:
-                item = workpiece[scheme][beam_name]
-                if isinstance(item, dict) and "price" in item:
-                    item["price"] = round(item["price"] * wood_ratio, 2)
-                elif isinstance(item, (int, float)):
-                    workpiece[scheme][beam_name] = round(item * wood_ratio, 2)
-
-    for scheme in schemes:
-        calculated_work = calculate_work(workpiece, portal_width, portal_height)[scheme]
-        work_data[scheme] = calculated_work
-        work_result = summ_work(calculated_work)
-        workpiece[scheme]["Работа столяр"] = {
-            "price": work_result["столяр"],
-            "w_list": {"-": "-"},
-        }
-        workpiece[scheme]["Работа маляр"] = {
-            "price": work_result["маляр"],
-            "w_list": {"-": "-"},
-        }
-
-    return workpiece, work_data
+    result["ИТОГО"] = total_price
+    return result
 
 
 def calculate_glukhar_color(color, width, height, n_amount) -> dict:
@@ -675,23 +700,25 @@ def get_all_price(result):
     return price
 
 
-def calculate_glukhar(glukhar_data: dict):
+def calculate_glukhar(glukhar_data: list):
     result = {}
-    material = glukhar_data.pop("material")
-    color = glukhar_data.pop("color")
+    total_price = 0
     for glukhar in glukhar_data:
-        result[glukhar] = {}
-        width = glukhar_data[glukhar]["width"]
-        height = glukhar_data[glukhar]["height"]
-        amount = glukhar_data[glukhar]["amount"]
-        not_rectangle = glukhar_data[glukhar]["is_not_rectangle"]
+        name = glukhar["name"]
+        result[name] = {}
+        width = glukhar["width"]
+        height = glukhar["height"]
+        amount = glukhar["amount"]
+        material = glukhar["material"]
+        color = glukhar["color"]
+        not_rectangle = glukhar["is_not_rectangle"]
 
         glukhar_price = ceil(
             get_price_glukhar(material)
             * find_multiple_perimeter(get_perimeter(width, height)),
         )
-        result[glukhar]["N"] = amount
-        result[glukhar][f"Брус ({material})"] = {
+        result[name]["N"] = amount
+        result[name][f"Брус ({material})"] = {
             "price": glukhar_price,
             "length": 6000,
             "amount": count_bars(width, height),
@@ -700,11 +727,11 @@ def calculate_glukhar(glukhar_data: dict):
         }
 
         for keys, values in calculate_glukhar_color(color, width, height, amount).items():
-            result[glukhar][keys] = values
+            result[name][keys] = values
 
         glass_info = calculate_glukhar_glass(width, height, amount, not_rectangle)
-        result[glukhar]["Выгрузка"] = glass_info.pop("unloading")
-        result[glukhar]["Стеклопакет"] = glass_info
+        result[name]["Выгрузка"] = glass_info.pop("unloading")
+        result[name]["Стеклопакет"] = glass_info
 
         carpenter_salary = ceil(
             (width * height / 1_000_000) * get_salary("door", "carpenter"),
@@ -712,14 +739,14 @@ def calculate_glukhar(glukhar_data: dict):
         painter_salary = ceil(
             (width * height / 1_000_000) * get_salary("door", "painter"),
         )
-        result[glukhar]["Работа столяра"] = {
+        result[name]["Работа столяра"] = {
             "price": carpenter_salary,
             "length": "-",
             "amount": 1,
             "N_amount": amount,
             "N_price": amount * carpenter_salary,
         }
-        result[glukhar]["Работа маляра"] = {
+        result[name]["Работа маляра"] = {
             "price": painter_salary,
             "length": "-",
             "amount": 1,
@@ -727,13 +754,17 @@ def calculate_glukhar(glukhar_data: dict):
             "N_price": amount * painter_salary,
         }
 
-        total_price = get_all_price(result[glukhar])
-        result[glukhar]["ИТОГО"] = {
+        total_price = get_all_price(result[name])
+        result[name]["ИТОГО"] = {
             "price": total_price,
             "length": "-",
             "amount": 1,
             "N_amount": amount,
             "N_price": amount * total_price,
         }
+        result[name]["type"] = "glukhar"
 
+        total_price += result[name]["ИТОГО"]["N_price"]
+
+    result["ИТОГО"] = total_price
     return result

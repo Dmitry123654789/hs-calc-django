@@ -204,8 +204,7 @@
 
             const formData = new FormData(form);
             const payload = {
-                material: formData.get('material'),
-                color: formData.get('color')
+                glukhars: [],
             };
 
             const cards = container.querySelectorAll('.glukhar-card');
@@ -224,9 +223,15 @@
                     return;
                 }
 
-                payload[`glukhar${index + 1}`] = {
-                    width: width, height: height, amount: amount, is_not_rectangle: isNotRect
-                };
+                payload.glukhars.push({
+                    name: `glukhar_${index}`,
+                    width: width,
+                    height: height,
+                    amount: amount,
+                    is_not_rectangle: isNotRect,
+                    material: formData.get('material'),
+                    color: formData.get('color'),
+                });
                 originalDimensions.push({ width, height });
                 
                 // Считаем общую площадь в м² для монтажа
@@ -304,14 +309,6 @@
                 const color = glukhar['RAL-эмаль'] ? 'RAL' : (glukhar['Лесс-лак'] ? 'Лесс' : 'RAL');
 
                 const rowOrder = [
-                    { display: materialFullName, keyFunc: () => materialFullName, isSimpleNumber: false },
-                    { display: color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', keyFunc: () => color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', isSimpleNumber: false },
-                    ...(color === 'RAL' ? [{ display: 'RAL-грунт', keyFunc: () => 'RAL-грунт', isSimpleNumber: false }] : []),
-                    ...(color === 'Лесс' ? [{ display: 'Лесс-грунт', keyFunc: () => 'Лесс-грунт', isSimpleNumber: false }] : []),
-                    { display: 'Стеклопакет', keyFunc: () => 'Стеклопакет', isSimpleNumber: false },
-                    { display: 'Выгрузка', keyFunc: () => 'Выгрузка', isSimpleNumber: true },
-                    { display: 'Работа столяра', keyFunc: () => 'Работа столяра', isSimpleNumber: false },
-                    { display: 'Работа маляра', keyFunc: () => 'Работа маляра', isSimpleNumber: false },
                     { display: 'ИТОГО', keyFunc: () => 'ИТОГО', isSimpleNumber: false }
                 ];
 
@@ -321,8 +318,6 @@
                         <div class="card-body p-0 table-responsive">
                             <table class="table table-striped table-bordered table-sm mb-0">
                                 <thead class="table-light"><tr>
-                                    <th>НАИМЕНОВАНИЕ</th><th>СТОИМОСТЬ</th><th>РАЗМЕР</th>
-                                    <th>КОЛ-ВО ЗА 1 ШТ</th><th>КОЛ-ВО ЗА ${N_amount} ШТ</th><th>СТОИМОСТЬ ЗА ${N_amount} ШТ</th>
                                 </tr></thead><tbody>`;
                 
                 for (let item of rowOrder) {
@@ -347,7 +342,7 @@
                             baseTotalPrice += parseFloat(rowData.N_price) || 0;
                         }
 
-                        html += `<tr ${rowClass}><td>${item.display}</td><td>${priceStr}</td><td>${sizeText}</td><td>${rowData.amount}</td><td>${rowData.N_amount}</td><td>${nPriceStr}</td></tr>`;
+                        html += `<tr ${rowClass}><td>${item.display}</td><td>${nPriceStr}</td></tr>`;
                     }
                 }
                 html += `</tbody></table></div></div></div>`;
@@ -388,8 +383,7 @@
             </div>`;
             
             html += `<div class="d-flex flex-wrap gap-2 mb-5">
-                <button type="button" class="btn btn-success" id="excelDownloadBtn">📎 Скачать в Excel</button>
-                <button type="button" class="btn btn-primary ms-auto" id="saveOrderBtn">💾 Сохранить заказ в базу</button>
+                <button type="button" class="btn btn-primary ms-auto" id="saveOrderBtn">Сохранить заказ в базу</button>
             </div>`;
 
             resultContainer.innerHTML = html;
@@ -402,7 +396,6 @@
             // Первичный пересчет при отображении
             enforceMinimumsAndRecalculate();
 
-            document.getElementById('excelDownloadBtn').onclick = () => exportToExcel(lastCalculationResult, getFinalTotal(), originalDimensions);
             document.getElementById('saveOrderBtn').onclick = () => saveOrder(document.getElementById('saveOrderBtn'));
         }
 
@@ -424,202 +417,6 @@
             return subTotal - discount;
         }
 
-        // 6. Динамическое подключение XLSX библиотеки и функции экспорта (из glukhar1.html)
-        let xlsxPromise = null;
-        function loadXLSX() {
-            if (typeof XLSX !== 'undefined') return Promise.resolve();
-            if (xlsxPromise) return xlsxPromise;
-
-            xlsxPromise = new Promise((resolve, reject) => {
-                const script = document.createElement('script');
-                script.src = 'https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js';
-                script.async = true;
-                const timeout = setTimeout(() => {
-                    reject(new Error('Таймаут загрузки библиотеки Excel. Проверьте интернет-соединение.'));
-                }, 8000);
-                script.onload = () => { clearTimeout(timeout); resolve(); };
-                script.onerror = () => { clearTimeout(timeout); reject(new Error('Ошибка загрузки XLSX. Возможно, CDN заблокирован.')); };
-                document.head.appendChild(script);
-            });
-            return xlsxPromise;
-        }
-
-        function exportToCSV(data, totalPrice, sizesArray) {
-            const glukharKeys = Object.keys(data).filter(k => k.startsWith('glukhar')).sort((a,b) => parseInt(a.replace('glukhar','')) - parseInt(b.replace('glukhar','')));
-            let csvRows = [];
-
-            for (let idx = 0; idx < glukharKeys.length; idx++) {
-                const key = glukharKeys[idx];
-                const glukhar = data[key];
-                const N_amount = glukhar['N'];
-                const materialKey = Object.keys(glukhar).find(k => k.startsWith('Брус'));
-                const materialFullName = materialKey || 'Брус';
-                const color = glukhar['RAL-эмаль'] ? 'RAL' : (glukhar['Лесс-лак'] ? 'Лесс' : 'RAL');
-
-                const rowOrder = [
-                    { display: materialFullName, keyFunc: () => materialFullName },
-                    { display: color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', keyFunc: () => color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак' },
-                    ...(color === 'RAL' ? [{ display: 'RAL-грунт', keyFunc: () => 'RAL-грунт' }] : []),
-                    ...(color === 'Лесс' ? [{ display: 'Лесс-грунт', keyFunc: () => 'Лесс-грунт' }] : []),
-                    { display: 'Стеклопакет', keyFunc: () => 'Стеклопакет' },
-                    { display: 'Выгрузка', keyFunc: () => 'Выгрузка', isSimpleNumber: true },
-                    { display: 'Работа столяра', keyFunc: () => 'Работа столяра' },
-                    { display: 'Работа маляра', keyFunc: () => 'Работа маляра' },
-                    { display: 'ИТОГО', keyFunc: () => 'ИТОГО' }
-                ];
-
-                let headerName = `Глухарь ${idx+1}`;
-                if (sizesArray && sizesArray[idx] && sizesArray[idx].width && sizesArray[idx].height) {
-                    const w = sizesArray[idx].width;
-                    const h = sizesArray[idx].height;
-                    headerName += ` (${w} x ${h} мм, площадь ${(w*h/1000000).toFixed(1)} м²)`;
-                }
-                csvRows.push([headerName]);
-                csvRows.push(['НАИМЕНОВАНИЕ', 'СТОИМОСТЬ', 'РАЗМЕР', 'КОЛ-ВО ЗА 1 ШТ', `КОЛ-ВО ЗА ${N_amount} ШТ`, `СТОИМОСТЬ ЗА ${N_amount} ШТ`]);
-
-                for (let item of rowOrder) {
-                    const rowKey = item.keyFunc();
-                    const rowData = glukhar[rowKey];
-                    if (rowData === undefined) continue;
-
-                    if (item.isSimpleNumber && typeof rowData === 'number') {
-                        if (item.display === 'Выгрузка' && rowData === 0) continue;
-                        csvRows.push([item.display, rowData.toFixed(2), '—', 1, N_amount, (rowData * N_amount).toFixed(2)]);
-                        continue;
-                    }
-
-                    if (typeof rowData === 'object' && rowData !== null) {
-                        let sizeText = '—';
-                        if (rowData.length && typeof rowData.length === 'object') {
-                            sizeText = `${rowData.length.w} x ${rowData.length.h}`;
-                        } else if (rowData.length !== undefined && rowData.length !== '-') {
-                            sizeText = rowData.length;
-                        }
-                        csvRows.push([
-                            item.display,
-                            typeof rowData.price === 'number' ? rowData.price.toFixed(2) : rowData.price,
-                            sizeText,
-                            rowData.amount,
-                            rowData.N_amount,
-                            typeof rowData.N_price === 'number' ? rowData.N_price.toFixed(2) : rowData.N_price
-                        ]);
-                    }
-                }
-                csvRows.push([]);
-            }
-
-            // Добавляем дополнительные параметры в CSV
-            csvRows.push(['Монтаж (руб/м²)', document.getElementById('installRate').value]);
-            csvRows.push(['Доставка (руб)', document.getElementById('deliveryCost').value]);
-            csvRows.push(['Разгрузка (руб)', document.getElementById('unloadingCost').value]);
-            csvRows.push(['Наценка', document.getElementById('profitRatio').textContent]);
-            csvRows.push(['Скидка (руб)', document.getElementById('discountRate').value]);
-            csvRows.push([]);
-            csvRows.push([`ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${totalPrice.toFixed(2)} руб.`]);
-
-            const csvContent = csvRows.map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(';')).join('\n');
-            const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
-            const link = document.createElement('a');
-            link.href = URL.createObjectURL(blob);
-            link.setAttribute('download', `glukhari_order_${new Date().toISOString().slice(0,19)}.csv`);
-            document.body.appendChild(link);
-            link.click();
-            document.body.removeChild(link);
-        }
-
-        async function exportToExcel(data, finalTotal, sizesArray) {
-            try {
-                await loadXLSX();
-                const glukharKeys = Object.keys(data).filter(k => k.startsWith('glukhar')).sort((a,b) => parseInt(a.replace('glukhar','')) - parseInt(b.replace('glukhar','')));
-                const allRows = [];
-
-                for (let idx = 0; idx < glukharKeys.length; idx++) {
-                    const key = glukharKeys[idx];
-                    const glukhar = data[key];
-                    const N_amount = glukhar['N'];
-                    const materialKey = Object.keys(glukhar).find(k => k.startsWith('Брус'));
-                    const materialFullName = materialKey || 'Брус';
-                    const color = glukhar['RAL-эмаль'] ? 'RAL' : (glukhar['Лесс-лак'] ? 'Лесс' : 'RAL');
-
-                    const rowOrder = [
-                        { display: materialFullName, keyFunc: () => materialFullName, isSimpleNumber: false },
-                        { display: color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', keyFunc: () => color === 'RAL' ? 'RAL-эмаль' : 'Лесс-лак', isSimpleNumber: false },
-                        ...(color === 'RAL' ? [{ display: 'RAL-грунт', keyFunc: () => 'RAL-грунт', isSimpleNumber: false }] : []),
-                        ...(color === 'Лесс' ? [{ display: 'Лесс-грунт', keyFunc: () => 'Лесс-грунт', isSimpleNumber: false }] : []),
-                        { display: 'Стеклопакет', keyFunc: () => 'Стеклопакет', isSimpleNumber: false },
-                        { display: 'Выгрузка', keyFunc: () => 'Выгрузка', isSimpleNumber: true },
-                        { display: 'Работа столяра', keyFunc: () => 'Работа столяра', isSimpleNumber: false },
-                        { display: 'Работа маляра', keyFunc: () => 'Работа маляра', isSimpleNumber: false },
-                        { display: 'ИТОГО', keyFunc: () => 'ИТОГО', isSimpleNumber: false }
-                    ];
-
-                    let headerName = `Глухарь ${idx+1}`;
-                    if (sizesArray && sizesArray[idx] && sizesArray[idx].width && sizesArray[idx].height) {
-                        const w = sizesArray[idx].width, h = sizesArray[idx].height;
-                        headerName += ` (${w} x ${h} мм, площадь ${(w*h/1000000).toFixed(1)} м²)`;
-                    }
-                    allRows.push([headerName]);
-                    allRows.push(['НАИМЕНОВАНИЕ', 'СТОИМОСТЬ', 'РАЗМЕР', 'КОЛ-ВО ЗА 1 ШТ', `КОЛ-ВО ЗА ${N_amount} ШТ`, `СТОИМОСТЬ ЗА ${N_amount} ШТ`]);
-
-                    for (let item of rowOrder) {
-                        const rowKey = item.keyFunc();
-                        const rowData = glukhar[rowKey];
-                        if (rowData === undefined) continue;
-
-                        if (item.isSimpleNumber && typeof rowData === 'number') {
-                            if (item.display === 'Выгрузка' && rowData === 0) continue;
-                            allRows.push([item.display, rowData, '—', 1, N_amount, rowData * N_amount]);
-                            continue;
-                        }
-
-                        if (typeof rowData === 'object' && rowData !== null) {
-                            let sizeText = '—';
-                            if (rowData.length && typeof rowData.length === 'object') {
-                                sizeText = `${rowData.length.w} x ${rowData.length.h}`;
-                            } else if (rowData.length !== undefined && rowData.length !== '-') {
-                                sizeText = rowData.length;
-                            }
-                            const price = typeof rowData.price === 'number' ? rowData.price : parseFloat(rowData.price);
-                            const n_price = typeof rowData.N_price === 'number' ? rowData.N_price : parseFloat(rowData.N_price);
-                            allRows.push([
-                                item.display,
-                                isNaN(price) ? rowData.price : price,
-                                sizeText,
-                                rowData.amount,
-                                rowData.N_amount,
-                                isNaN(n_price) ? rowData.N_price : n_price
-                            ]);
-                        }
-                    }
-                    allRows.push([]);
-                }
-
-                // Добавление блока дополнительных услуг в конец Excel файла
-                allRows.push(['ДОПОЛНИТЕЛЬНЫЕ УСЛУГИ И ПАРАМЕТРЫ']);
-                allRows.push(['Монтаж (руб/м²)', parseFloat(document.getElementById('installRate').value) || 0]);
-                allRows.push(['Доставка (руб)', parseFloat(document.getElementById('deliveryCost').value) || 0]);
-                allRows.push(['Разгрузка (руб)', parseFloat(document.getElementById('unloadingCost').value) || 0]);
-                allRows.push(['Наценка', parseFloat(document.getElementById('profitRatio').textContent) || 1.0]);
-                allRows.push(['Скидка (руб)', parseFloat(document.getElementById('discountRate').value) || 0]);
-                allRows.push([]);
-                allRows.push([`ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toFixed(2)} руб.`]);
-
-                const ws = XLSX.utils.aoa_to_sheet(allRows);
-                ws['!cols'] = [{wch:25},{wch:12},{wch:18},{wch:14},{wch:18},{wch:18}];
-                const wb = XLSX.utils.book_new();
-                XLSX.utils.book_append_sheet(wb, ws, 'Глухари');
-                XLSX.writeFile(wb, `glukhari_order_${new Date().toISOString().slice(0,19)}.xlsx`);
-            } catch (err) {
-                console.warn('Ошибка загрузки XLSX, используем CSV:', err);
-                const useCSV = confirm('Не удалось загрузить библиотеку Excel. Скачать отчёт в формате CSV?');
-                if (useCSV) {
-                    exportToCSV(data, finalTotal, sizesArray);
-                } else {
-                    showAlert('Экспорт отменён.');
-                }
-            }
-        }
-
         // 7. Сохранение заказа в базу (с новыми полями)
         async function saveOrder(btnElement) {
             if (!lastPayload) return;
@@ -627,10 +424,10 @@
             payload.buyer_id = buyerSelect.value;
             
             // Добавляем новые параметры в payload
-            payload.installation = parseFloat(document.getElementById('installRate').value) || 12000;
-            payload.delivery = parseFloat(document.getElementById('deliveryCost').value) || 50000;
-            payload.unloading = parseFloat(document.getElementById('unloadingCost').value) || 50000;
-            payload.profit_ratio = parseFloat(document.getElementById('profitRatio').textContent) || 1.0;
+            payload.installation = parseFloat(document.getElementById('installRate').value);
+            payload.delivery = parseFloat(document.getElementById('deliveryCost').value);
+            payload.unloading = parseFloat(document.getElementById('unloadingCost').value);
+            payload.profit_ratio = parseFloat(document.getElementById('profitRatio').textContent);
             payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
             
             if (payload.buyer_id === 'new') {
@@ -644,6 +441,11 @@
             
             btnElement.disabled = true;
             btnElement.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+            
+            const combinedPayload = {
+                config: payload,
+                calculations: lastCalculationResult
+            };
 
             try {
                 const response = await fetch('{% url "calculate:glukhar_save" %}', {
@@ -652,7 +454,7 @@
                         'Content-Type': 'application/json',
                         'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value 
                     },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(combinedPayload)
                 });
                 const data = await response.json();
                 if (data.status === 'success') {
@@ -662,12 +464,12 @@
                 } else {
                     showAlert('Ошибка сохранения: ' + data.error);
                     btnElement.disabled = false;
-                    btnElement.innerHTML = '💾 Сохранить заказ в базу';
+                    btnElement.innerHTML = 'Сохранить заказ в базу';
                 }
             } catch (err) {
                 showAlert('Ошибка соединения: ' + err.message);
                 btnElement.disabled = false;
-                btnElement.innerHTML = '💾 Сохранить заказ в базу';
+                btnElement.innerHTML = 'Сохранить заказ в базу';
                 }
             }
         });

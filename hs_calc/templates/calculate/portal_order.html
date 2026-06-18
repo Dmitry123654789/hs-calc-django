@@ -121,8 +121,7 @@
 
                     <div class="col-md-7">
                         <h6 class="fw-bold text-primary mb-2">🪟 Схема открывания</h6>
-                        <div class="p-schemes-container row g-2">
-                            </div>
+                        <div class="p-schemes-container row g-2"></div>
                     </div>
                 </div>
             </div>
@@ -134,8 +133,8 @@
 {% block scripts %}
 <script>
     document.addEventListener('DOMContentLoaded', function() {
-        // Получаем массив всех схем из контекста Django
         const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
+        const profitRatioFromContext = parseFloat('{{ profit_ratio }}') || 1.0;
         
         const container = document.getElementById('portalContainer');
         const template = document.getElementById('portalCardTemplate');
@@ -144,6 +143,7 @@
         const resultContainer = document.getElementById('resultsContainer');
         const buyerSelect = document.getElementById('buyerSelect');
         const newBuyerFields = document.getElementById('newBuyerFields');
+        let lastCalculationResult = null;
         
         let portalIdCounter = 0;
         let lastPayload = null;
@@ -174,7 +174,6 @@
             newBuyerFields.style.display = this.value === 'new' ? 'block' : 'none';
         });
 
-        // Функция обновления доступности схем внутри конкретной карточки
         function updateCardSchemesAvailability(cardWrapper) {
             const widthInput = cardWrapper.querySelector('.p-width');
             const width = parseInt(widthInput.value) || 0;
@@ -186,7 +185,6 @@
                 const radio = item.querySelector('.scheme-radio');
 
                 if (width >= min && width <= max) {
-                    // Разрешено к выбору
                     radio.disabled = false;
                     item.classList.remove('opacity-50', 'bg-light', 'border-secondary');
                     if (radio.checked) {
@@ -197,19 +195,17 @@
                     }
                     item.style.pointerEvents = 'auto';
                 } else {
-                    // Запрещено к выбору (Видно, но readonly)
                     radio.disabled = true;
                     if (radio.checked) {
-                        radio.checked = false; // сбрасываем выбор, если стал недоступен
+                        radio.checked = false;
                     }
                     item.classList.remove('border-success', 'border-dark', 'shadow-sm');
                     item.classList.add('opacity-50', 'bg-light', 'border-secondary');
-                    item.style.pointerEvents = 'none'; // Отключаем клики по блоку
+                    item.style.pointerEvents = 'none';
                 }
             });
         }
 
-        // Отрисовка рамки вокруг выбранной радиокнопки схемы
         function updateSchemeVisualSelection(cardWrapper) {
             const items = cardWrapper.querySelectorAll('.scheme-item');
             items.forEach(item => {
@@ -226,24 +222,19 @@
             });
         }
 
-        // Функция добавления новой карточки портала
         function addPortalCard() {
             portalIdCounter++;
             const clone = template.content.cloneNode(true);
             const cardWrapper = clone.querySelector('.portal-card-wrapper');
-            
-            // Уникальный ID для группировки радиокнопок схем внутри этой карточки
             const currentCardIndex = portalIdCounter;
             
             cardWrapper.querySelector('.portal-title').textContent = `Портал #${currentCardIndex}`;
             
-            // Навешиваем удаление карточки
             cardWrapper.querySelector('.remove-portal-btn').addEventListener('click', function() {
                 cardWrapper.remove();
                 renumberCards();
             });
 
-            // Генерация сетки всех схем внутри карточки
             const schemesContainer = cardWrapper.querySelector('.p-schemes-container');
             schemesData.forEach(scheme => {
                 const schemeItem = document.createElement('div');
@@ -260,7 +251,6 @@
                     <span class="text-muted" style="font-size: 0.75rem;">${scheme.min_size} - ${scheme.max_size} мм</span>
                 `;
 
-                // Обработчик клика по блоку схемы
                 schemeItem.addEventListener('click', function() {
                     const radio = schemeItem.querySelector('.scheme-radio');
                     if (!radio.disabled) {
@@ -272,13 +262,10 @@
                 schemesContainer.appendChild(schemeItem);
             });
 
-            // Слушатель изменения ширины для пересчета доступности схем
             const widthInput = cardWrapper.querySelector('.p-width');
             widthInput.addEventListener('input', () => updateCardSchemesAvailability(cardWrapper));
             
             container.appendChild(cardWrapper);
-            
-            // Первичный расчет доступности схем для дефолтных значений
             updateCardSchemesAvailability(cardWrapper);
         }
 
@@ -289,11 +276,9 @@
             });
         }
 
-        // Добавляем первый портал при загрузке
         addPortalCard();
         addBtn.addEventListener('click', addPortalCard);
 
-        // Отправка формы на расчет
         form.addEventListener('submit', function(e) {
             e.preventDefault();
 
@@ -303,14 +288,11 @@
                 return;
             }
 
-            const payload = {
-                portals: []
-            };
-
+            const payload = { portals: [] };
             let isValid = true;
             totalArea = 0;
 
-            cards.forEach((card) => {
+            cards.forEach((card, index) => {
                 const width = parseFloat(card.querySelector('.p-width').value);
                 const height = parseFloat(card.querySelector('.p-height').value);
                 const amount = parseInt(card.querySelector('.p-amount').value);
@@ -322,25 +304,25 @@
                 const hardwareColor = card.querySelector('.p-hardware-color').value;
                 const glazing = card.querySelector('.p-glazing').value;
 
-                // Находим выбранную схему в данной карточке
                 const selectedSchemeRadio = card.querySelector('.scheme-radio:checked');
-                
                 if (!selectedSchemeRadio) {
                     isValid = false;
                     return;
                 }
 
+                // Передаем дублирующие наборы ключей для совместимости с services.py и views.py
                 payload.portals.push({
+                    name: `portal_${index}`,
                     width: width,
                     height: height,
-                    amount: amount,
                     has_rain: hasRain,
                     wood_type: wood_type,
                     color: color,
                     hardware: hardware,
-                    hardware_color: hardwareColor,
                     glazing: glazing,
-                    scheme: selectedSchemeRadio.value
+                    scheme: selectedSchemeRadio.value,
+                    hardware_color: hardwareColor,
+                    amount: amount,
                 });
 
                 totalArea += (width * height / 1000000) * amount;
@@ -354,8 +336,7 @@
             lastPayload = payload;
             resultContainer.innerHTML = `<div class="text-center mt-4"><div class="spinner-border text-primary"></div><p class="mt-2">Выполняется расчет позиций...</p></div>`;
 
-            // Запрос к API расчета
-            fetch('{% url "calculate:portal_order_calculate" %}', { 
+            fetch('{% url "calculate:portal_order" %}', { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
                 body: JSON.stringify(payload)
@@ -363,6 +344,7 @@
             .then(res => res.json())
             .then(data => {
                 if (data.error) throw new Error(data.error);
+                lastCalculationResult = data;
                 displayResults(data);
             })
             .catch(error => {
@@ -373,26 +355,30 @@
 
         function displayResults(data) {
             let html = '<h3 class="mb-3 border-bottom pb-2 mt-5">📊 Результаты пакетного расчета</h3>';
-            baseTotalPrice = data.total_portals_price || 0;
+            baseTotalPrice = data["ИТОГО"] || 0;
 
-            // Генерируем карточки для каждого портала
             let cardsHtml = '<div class="row g-3 mb-4">';
-            data.results.forEach(p => {
-                // Обрабатываем чекбокс для скрытой формы
-                let hasRainInput = p.has_rain ? '<input type="hidden" name="has_rain" value="on">' : '';
-                
+            
+            // Итерируемся по отправленному массиву, так как структура ответа - это словарь с именами
+            lastPayload.portals.forEach((p, index) => {
+                const portalResult = data[p.name] || {};
+                const portalTotal = portalResult.portal_total || 0;
+                const currentArea = (p.width * p.height / 1000000) * p.amount;
+
                 cardsHtml += `
                 <div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm border-secondary">
                         <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
-                            <span>Портал #${p.id}</span>
+                            <span>Портал #${index + 1}</span>
                             <span class="badge bg-primary">x${p.amount} шт.</span>
                         </div>
                         <div class="card-body p-0">
                             <table class="table table-sm table-bordered mb-0 text-center align-middle">
                                 <tbody>
-                                    <tr><td class="text-start ps-1 fw-semibold">Площадь</td><td>${p.width * p.height / 1000000 * p.amount} м²</td></tr>
-                                    <tr class="table-secondary fw-bold"><td class="text-start ps-3">ИТОГО за позицию</td><td>${p.portal_total.toLocaleString('ru-RU', {minimumFractionDigits: 2})}</td></tr>
+                                    <tr><td class="text-start ps-2 fw-semibold small">Схема / Дерево</td><td class="small">${p.scheme} / ${p.wood_type}</td></tr>
+                                    <tr><td class="text-start ps-2 fw-semibold small">Размер</td><td class="small">${p.width} x ${p.height} мм</td></tr>
+                                    <tr><td class="text-start ps-2 fw-semibold small">Площадь</td><td class="small">${currentArea.toFixed(2)} м²</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${portalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -400,10 +386,8 @@
                 </div>`;
             });
             cardsHtml += '</div>';
-
             html += cardsHtml;
 
-            // Дополнительные параметры заказа (Полная копия структуры из Glukhar)
             html += `
             <div class="card mb-4 bg-light shadow-sm border-secondary">
                 <div class="card-body">
@@ -423,7 +407,7 @@
                         </div>
                         <div class="col-lg col-md-6">
                             <label class="form-label fw-bold small">Наценка</label>
-                            <div class="form-control bg-white fw-bold" id="profitRatio">${data.profit_ratio || '1.0'}</div>
+                            <div class="form-control bg-white fw-bold" id="profitRatio">${profitRatioFromContext}</div>
                         </div>
                         <div class="col-lg col-md-6">
                             <label class="form-label fw-bold text-danger small">Скидка (руб)</label>
@@ -437,7 +421,7 @@
             </div>`;
             
             html += `<div class="d-flex flex-wrap gap-2 mb-5">
-                <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">💾 Сохранить спецификацию заказа</button>
+                <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">Сохранить заказ в базу</button>
             </div>`;
 
             resultContainer.innerHTML = html;
@@ -478,15 +462,24 @@
                     email: document.getElementById('buyerEmail').value
                 };
             }
+            else
+            {
+                payload.buyer_data = {};
+            }
             
             btnElement.disabled = true;
             btnElement.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+            
+            const combinedPayload = {
+                config: payload,
+                calculations: lastCalculationResult
+            };
 
             try {
                 const response = await fetch('{% url "calculate:portal_order_save" %}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
-                    body: JSON.stringify(payload)
+                    body: JSON.stringify(combinedPayload)
                 });
                 const data = await response.json();
                 if (data.status === 'success') {
@@ -496,12 +489,12 @@
                 } else {
                     showAlert('Ошибка при сохранении: ' + data.error);
                     btnElement.disabled = false;
-                    btnElement.innerHTML = '💾 Сохранить спецификацию заказа';
+                    btnElement.innerHTML = 'Сохранить заказ в базу';
                 }
             } catch (err) {
                 showAlert('Ошибка сети/соединения: ' + err.message);
                 btnElement.disabled = false;
-                btnElement.innerHTML = '💾 Сохранить спецификацию заказа';
+                btnElement.innerHTML = 'Сохранить заказ в базу';
             }
         }
     });

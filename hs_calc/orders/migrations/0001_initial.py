@@ -10,7 +10,7 @@ class Migration(migrations.Migration):
     initial = True
 
     dependencies = [
-        ("users", "0004_buyer_alter_profile_role"),
+        ("users", "0001_squashed_0005_alter_profile_percentage_sale"),
         migrations.swappable_dependency(settings.AUTH_USER_MODEL),
     ]
 

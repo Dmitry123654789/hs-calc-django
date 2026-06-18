@@ -5,13 +5,15 @@ import django.urls
 
 import about.urls
 import calculate.urls
+import orders.urls
 import users.urls
 
 
 urlpatterns = [
     django.urls.path("admin/", django.contrib.admin.site.urls),
-    django.urls.path("calculator/", django.urls.include(calculate.urls)),
     django.urls.path("auth/", django.urls.include(users.urls)),
+    django.urls.path("calculator/", django.urls.include(calculate.urls)),
+    django.urls.path("order/", django.urls.include(orders.urls)),
     django.urls.path("", django.urls.include(about.urls)),
 ]
 

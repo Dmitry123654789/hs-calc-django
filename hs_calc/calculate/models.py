@@ -1,32 +1,42 @@
-import django.db.models
+from django.db.models import (
+    BooleanField,
+    CharField,
+    DecimalField,
+    ForeignKey,
+    JSONField,
+    Model,
+    PositiveIntegerField,
+    PROTECT,
+    TextChoices,
+)
 
 import orders.models
 
 
-class Scheme(django.db.models.Model):
-    name = django.db.models.CharField(
+class Scheme(Model):
+    name = CharField(
         max_length=100,
         verbose_name="Название схемы",
     )
-    min_size = django.db.models.PositiveIntegerField(
+    min_size = PositiveIntegerField(
         verbose_name="Мин. размер (мм)",
     )
-    max_size = django.db.models.PositiveIntegerField(
+    max_size = PositiveIntegerField(
         verbose_name="Макс. размер (мм)",
     )
-    door = django.db.models.PositiveIntegerField()
-    fixed_sash = django.db.models.PositiveIntegerField()
-    rail_amour = django.db.models.PositiveIntegerField()
-    door_sub = django.db.models.PositiveIntegerField()
-    sash_sub = django.db.models.PositiveIntegerField()
+    door = PositiveIntegerField()
+    fixed_sash = PositiveIntegerField()
+    rail_amour = PositiveIntegerField()
+    door_sub = PositiveIntegerField()
+    sash_sub = PositiveIntegerField()
 
     def __str__(self):
         return self.name
 
 
-class BaseMaterial(django.db.models.Model):
-    name = django.db.models.CharField(max_length=50)
-    price = django.db.models.PositiveIntegerField()
+class BaseMaterial(Model):
+    name = CharField(max_length=50)
+    price = PositiveIntegerField()
 
     class Meta:
         abstract = True
@@ -40,46 +50,46 @@ class Glass(BaseMaterial):
 
 
 class Beams(BaseMaterial):
-    length = django.db.models.PositiveIntegerField()
-    identity = django.db.models.CharField(max_length=50)
+    length = PositiveIntegerField()
+    identity = CharField(max_length=50)
 
 
 class GlukharWood(BaseMaterial):
-    length = django.db.models.PositiveIntegerField()
+    length = PositiveIntegerField()
 
     class Meta:
         db_table = "calculate_glukhar_wood"
 
 
 class Hardware(BaseMaterial):
-    length = django.db.models.PositiveIntegerField()
+    length = PositiveIntegerField()
 
 
 class GlukharGlass(BaseMaterial):
-    min_area = django.db.models.PositiveIntegerField()
-    max_area = django.db.models.PositiveIntegerField()
+    min_area = PositiveIntegerField()
+    max_area = PositiveIntegerField()
 
     class Meta:
         db_table = "calculate_glukhar_glass"
 
 
 class Color(BaseMaterial):
-    coverage_rate_doors = django.db.models.DecimalField(
+    coverage_rate_doors = DecimalField(
         max_digits=10,
         decimal_places=2,
     )
-    coverage_rate_sash = django.db.models.DecimalField(
+    coverage_rate_sash = DecimalField(
         max_digits=10,
         decimal_places=2,
     )
 
 
-class PortalWood(django.db.models.Model):
-    name = django.db.models.CharField(
+class PortalWood(Model):
+    name = CharField(
         max_length=50,
     )
 
-    ratio = django.db.models.DecimalField(
+    ratio = DecimalField(
         max_digits=5,
         decimal_places=2,
     )
@@ -88,11 +98,11 @@ class PortalWood(django.db.models.Model):
         db_table = "calculate_portal_wood"
 
 
-class ProfitRatio(django.db.models.Model):
-    name = django.db.models.CharField(
+class ProfitRatio(Model):
+    name = CharField(
         max_length=50,
     )
-    ratio = django.db.models.DecimalField(
+    ratio = DecimalField(
         max_digits=5,
         decimal_places=2,
     )
@@ -101,73 +111,75 @@ class ProfitRatio(django.db.models.Model):
         db_table = "calculate_profit_ratio"
 
 
-class Work(django.db.models.Model):
-    beam = django.db.models.CharField(max_length=50)
-    carpenter = django.db.models.DecimalField(max_digits=10, decimal_places=2)
-    painter = django.db.models.DecimalField(max_digits=10, decimal_places=2)
+class Work(Model):
+    beam = CharField(max_length=50)
+    carpenter = DecimalField(max_digits=10, decimal_places=2)
+    painter = DecimalField(max_digits=10, decimal_places=2)
 
 
-class BaseProduct(django.db.models.Model):
-    width = django.db.models.PositiveIntegerField(verbose_name="Ширина")
-    height = django.db.models.PositiveIntegerField(verbose_name="Высота")
+class BaseProduct(Model):
+    width = PositiveIntegerField(verbose_name="Ширина")
+    height = PositiveIntegerField(verbose_name="Высота")
 
-    color_type = django.db.models.ForeignKey(
+    color_type = ForeignKey(
         Color,
-        on_delete=django.db.models.PROTECT,
+        on_delete=PROTECT,
     )
-    is_finished = django.db.models.BooleanField(
+    is_finished = BooleanField(
         default=False,
     )
-    order = django.db.models.ForeignKey(
+    order = ForeignKey(
         orders.models.Order,
-        on_delete=django.db.models.PROTECT,
+        on_delete=PROTECT,
     )
-    amount = django.db.models.PositiveIntegerField(verbose_name="Количество")
+    amount = PositiveIntegerField(verbose_name="Количество")
+
+    calculation_details = JSONField(blank=True)
 
     class Meta:
         abstract = True
 
 
 class Portal(BaseProduct):
-    class Color(django.db.models.TextChoices):
+    class Color(TextChoices):
         Silver = "silver", "Серебро"
         Бронза = "bronze", "Бронза"
         White = "white", "Белый"
         Brown = "brown", "Коричневый"
 
-    glass = django.db.models.ForeignKey(
+    glass = ForeignKey(
         Glass,
-        on_delete=django.db.models.PROTECT,
+        on_delete=PROTECT,
     )
-    wood_type = django.db.models.ForeignKey(
+    wood_type = ForeignKey(
         PortalWood,
-        on_delete=django.db.models.PROTECT,
+        on_delete=PROTECT,
     )
-    scheme = django.db.models.ForeignKey(
+    scheme = ForeignKey(
         Scheme,
-        on_delete=django.db.models.PROTECT,
+        on_delete=PROTECT,
     )
-    hardware_type = django.db.models.ForeignKey(
+    hardware_type = ForeignKey(
         Hardware,
-        on_delete=django.db.models.PROTECT,
+        on_delete=PROTECT,
     )
-    hardware_color = django.db.models.CharField(
+    hardware_color = CharField(
         max_length=100,
         choices=Color.choices,
         default=Color.White,
     )
-    has_rain_protection = django.db.models.BooleanField(
+    has_rain_protection = BooleanField(
         default=False,
         verbose_name="Есть_ли_дождь",
     )
 
 
 class Glukhar(BaseProduct):
-    is_non_rectangular = django.db.models.BooleanField(
+    is_non_rectangular = BooleanField(
         default=False,
         verbose_name="Не_прямоугольник",
     )
-    wood_type = django.db.models.ForeignKey(
+    wood_type = ForeignKey(
         GlukharWood,
-        on_delete=django.db.models.PROTECT,
+        on_delete=PROTECT,
     )
