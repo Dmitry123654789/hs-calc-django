@@ -1,0 +1,376 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Детали заказа #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Детали расчета: Заказ #{{ order.id }}</h2>
+        <a href="{% url 'orders:orders_list' %}" class="btn btn-outline-secondary">Назад к списку</a>
+    </div>
+
+    <ul class="nav nav-tabs mb-4" id="orderMainTabs" role="tablist">
+        {% if portals %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="portals-tab" data-bs-toggle="tab" data-bs-target="#portals-pane" type="button" role="tab" aria-controls="portals-pane" aria-selected="true">
+                🚪 Порталы
+            </button>
+        </li>
+        {% endif %}
+        
+        {% if glukhars %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if not portals %}active{% endif %}" id="glukhars-tab" data-bs-toggle="tab" data-bs-target="#glukhars-pane" type="button" role="tab" aria-controls="glukhars-pane" aria-selected="{% if not portals %}true{% else %}false{% endif %}">
+                🪟 Глухари
+            </button>
+        </li>
+        {% endif %}
+    </ul>
+
+    <div class="tab-content" id="orderMainTabsContent">
+        
+        {% if portals %}
+        <div class="tab-pane fade show active" id="portals-pane" role="tabpanel" aria-labelledby="portals-tab">
+            
+            <ul class="nav nav-pills mb-4" id="portalSubTabs" role="tablist">
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link active" id="portal-materials-tab" data-bs-toggle="pill" data-bs-target="#portal-materials-pane" type="button" role="tab" aria-controls="portal-materials-pane" aria-selected="true">
+                        Материалы
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="portal-labor-tab" data-bs-toggle="pill" data-bs-target="#portal-labor-pane" type="button" role="tab" aria-controls="portal-labor-pane" aria-selected="false">
+                        Трудозатраты
+                    </button>
+                </li>
+            </ul>
+
+            <div class="tab-content" id="portalSubTabsContent">
+                <div class="tab-pane fade show active" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
+                    {% for product in portals %}
+                        {% if product.calculation_details.workpiece %}
+                            <h4 class="mt-4">Портал N{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }})</h4>
+                            {% for scheme_name, scheme_data in product.calculation_details.workpiece.items %}
+                                <div class="card mb-4 shadow-sm border-secondary">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0">Схема {{ scheme_name }} (Материалы)</h5>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-hover mb-0 align-middle main-table export-table" 
+                                                   data-sheet-name="Портал_{{ product.calculation_details.N }}_{{ scheme_name }}">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>ВИД</th>
+                                                        <th>ЦЕНА</th>
+                                                        <th>РАЗМЕР, мм</th>
+                                                        <th>КОЛ-ВО</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for detail_name, detail_data in scheme_data.items %}
+                                                        {% if detail_data and detail_data.price is not None %}
+                                                            {% for size, count in detail_data.w_list.items %}
+                                                                {% if size != 0 and size != "0" and count != 0 %}
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                                                    <td class="cell-name">{{ detail_name }}</td>
+                                                                    <td class="cell-price">{{ detail_data.price }}</td>
+                                                                    <td>{{ size }}</td>
+                                                                    <td>{{ count }}</td>
+                                                                </tr>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                            
+                                                            {% for size, count in detail_data.h_list.items %}
+                                                                {% if size != 0 and size != "0" and count != 0 %}
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                                                    <td class="cell-name">{{ detail_name }}</td>
+                                                                    <td class="cell-price">{{ detail_data.price }}</td>
+                                                                    <td>{{ size }}</td>
+                                                                    <td>{{ count }}</td>
+                                                                </tr>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                    <tr class="table-secondary fw-bold total-row">
+                                                        <td>ИТОГО ПО МАТЕРИАЛАМ</td>
+                                                        <td class="total-price-cell">0.00</td>
+                                                        <td colspan="2"></td>
+                                                    </tr>
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <div class="tab-pane fade" id="portal-labor-pane" role="tabpanel" aria-labelledby="portal-labor-tab">
+                    {% for product in portals %}
+                        {% if product.calculation_details.workpiece and product.calculation_details.work_data %}
+                            <h4 class="mt-4">Портал N{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }})</h4>
+                            {% for labor_scheme, labor_details in product.calculation_details.work_data.items %}
+                            <div class="card mb-5 shadow-sm border-info">
+                                <div class="card-header bg-info text-dark">
+                                    <h5 class="mb-0">Схема {{ labor_scheme }} (Трудозатраты)</h5>
+                                </div>
+                                <div class="card-body p-0">
+                                    <table class="table table-striped table-bordered mb-0 labor-table export-table" 
+                                           data-sheet-name="Труд_П{{ product.calculation_details.N }}_{{ labor_scheme }}">
+                                        <thead class="table-dark">
+                                            <tr>
+                                                <th>Деталь</th>
+                                                <th>Столяр</th>
+                                                <th>Маляр</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {% for detail, costs in labor_details.items %}
+                                            <tr class="labor-row" data-stolyar="{{ costs.столяр }}" data-malyar="{{ costs.маляр }}">
+                                                <td>{{ detail }}</td>
+                                                <td>{{ costs.столяр }}</td>
+                                                <td>{{ costs.маляр }}</td>
+                                            </tr>
+                                            {% endfor %}
+                                            <tr class="table-secondary fw-bold">
+                                                <td>ИТОГО</td>
+                                                <td class="total-stolyar-cell">0.00</td>
+                                                <td class="total-malyar-cell">0.00</td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if glukhars %}
+        <div class="tab-pane fade {% if not portals %}show active{% endif %}" id="glukhars-pane" role="tabpanel" aria-labelledby="glukhars-tab">
+            {% for product in glukhars %}
+                <h4 class="mt-4">Глухарь N{{ product.calculation_details.N|default:forloop.counter }} (Ш:{{ product.width }} x В:{{ product.height }})</h4>
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover mb-0 align-middle export-table" data-sheet-name="Глухарь_{{ product.calculation_details.N|default:forloop.counter }}">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Наименование</th>
+                                        <th>Цена за ед.</th>
+                                        <th>Длина/Размер</th>
+                                        <th>Кол-во</th>
+                                        <th>Сумма</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for key, val in product.calculation_details.items %}
+                                        {% if key != 'type' and key != 'N' and key != 'ИТОГО' %}
+                                        <tr>
+                                            <td>{{ key }}</td>
+                                            <td>{{ val.price }}</td>
+                                            <td>
+                                                {% if val.length.w %}
+                                                    {{ val.length.w }} x {{ val.length.h }}
+                                                {% else %}
+                                                    {{ val.length }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ val.N_amount }}</td>
+                                            <td>{{ val.N_price }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                                    <tr class="table-secondary fw-bold">
+                                        <td colspan="4" class="text-end pe-3">ИТОГО за изделие:</td>
+                                        <td>{{ product.calculation_details.ИТОГО.N_price }}</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="card mb-4 bg-light shadow-sm border-secondary mt-5">
+        <div class="card-header bg-dark text-white d-flex flex-wrap justify-content-between align-items-center gap-2">
+            <h5 class="mb-0">🚚 Дополнительные параметры и Итоги заказа</h5>
+            
+            <div class="input-group" style="width: auto;">
+                <select class="form-select form-select-sm" id="excelExportType" style="max-width: 280px;">
+                    <option value="all">Весь заказ (Все таблицы)</option>
+                    {% if portals %}
+                    <option value="portal_all">Порталы: все данные</option>
+                    <option value="portal_materials">Порталы: только материалы</option>
+                    <option value="portal_labor">Порталы: только трудозатраты</option>
+                    {% endif %}
+                </select>
+                <button class="btn btn-success btn-sm" type="button" onclick="triggerExcelExport()">
+                    <i class="bi bi-file-earmark-excel"></i> Сохранить в Excel
+                </button>
+            </div>
+        </div>
+        <div class="card-body p-0">
+            <table class="table table-bordered mb-0 text-center align-middle bg-white export-table" id="extra-costs-table" data-sheet-name="Доп_Услуги">
+                <thead class="table-light">
+                    <tr>
+                        <th>Скидка</th>
+                        <th>Доставка</th>
+                        <th>Установка (Монтаж)</th>
+                        <th>Разгрузка</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr class="fs-5">
+                        <td class="text-danger fw-bold">-{{ order.discount }} руб.</td>
+                        <td>{{ order.delivery }} руб.</td>
+                        <td>{{ order.installation }} руб.</td>
+                        <td>{{ order.unloading }} руб.</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/xlsx.full.min.js' %}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Подсчет rowspan и итогов для Порталов (Материалы)
+        document.querySelectorAll(".main-table").forEach(function(table) {
+            const rows = table.querySelectorAll("tbody tr.detail-row");
+            let currentDetail = null;
+            let startRowIdx = 0;
+            let currentSpan = 0;
+            let totalPrice = 0;
+            let uniqueDetails = new Set();
+
+            rows.forEach(function(row, index) {
+                const detailName = row.getAttribute("data-detail-name");
+                let priceStr = row.getAttribute("data-detail-price") || "0";
+                const detailPrice = parseFloat(priceStr.replace(',', '.')) || 0;
+
+                if (!uniqueDetails.has(detailName)) {
+                    uniqueDetails.add(detailName);
+                    totalPrice += detailPrice;
+                }
+
+                if (currentDetail === null) {
+                    currentDetail = detailName;
+                    startRowIdx = index;
+                    currentSpan = 1;
+                } else if (currentDetail === detailName) {
+                    currentSpan++;
+                    row.querySelector(".cell-name").remove();
+                    row.querySelector(".cell-price").remove();
+                } else {
+                    const firstRowOfGroup = rows[startRowIdx];
+                    firstRowOfGroup.querySelector(".cell-name").setAttribute("rowspan", currentSpan);
+                    firstRowOfGroup.querySelector(".cell-price").setAttribute("rowspan", currentSpan);
+
+                    currentDetail = detailName;
+                    startRowIdx = index;
+                    currentSpan = 1;
+                }
+            });
+
+            if (currentSpan > 0 && rows.length > 0) {
+                const firstRowOfGroup = rows[startRowIdx];
+                firstRowOfGroup.querySelector(".cell-name").setAttribute("rowspan", currentSpan);
+                firstRowOfGroup.querySelector(".cell-price").setAttribute("rowspan", currentSpan);
+            }
+
+            const totalCell = table.querySelector(".total-price-cell");
+            if (totalCell) totalCell.textContent = totalPrice.toFixed(2);
+        });
+
+        // Подсчет итогов для Порталов (Трудозатраты)
+        document.querySelectorAll(".labor-table").forEach(function(table) {
+            const rows = table.querySelectorAll("tbody tr.labor-row");
+            let totalStolyar = 0;
+            let totalMalyar = 0;
+
+            rows.forEach(function(row) {
+                totalStolyar += parseFloat(row.getAttribute("data-stolyar").replace(',', '.')) || 0;
+                totalMalyar += parseFloat(row.getAttribute("data-malyar").replace(',', '.')) || 0;
+            });
+
+            const stolyarCell = table.querySelector(".total-stolyar-cell");
+            const malyarCell = table.querySelector(".total-malyar-cell");
+            if (stolyarCell) stolyarCell.textContent = totalStolyar.toFixed(2);
+            if (malyarCell) malyarCell.textContent = totalMalyar.toFixed(2);
+        });
+    });
+
+    // Функция-обертка для чтения значения селекта и запуска выгрузки
+    function triggerExcelExport() {
+        const selectElem = document.getElementById('excelExportType');
+        const scope = selectElem ? selectElem.value : 'all';
+        exportOrderToExcel(scope);
+    }
+
+    function exportOrderToExcel(scope) {
+        if (typeof XLSX === 'undefined') {
+            alert('Ошибка: Библиотека xlsx.full.min.js не загружена.');
+            return;
+        }
+
+        try {
+            const wb = XLSX.utils.book_new();
+            let selector = '';
+            let fileNameSuffix = '';
+
+            switch(scope) {
+                case 'portal_materials':
+                    selector = '.main-table';
+                    fileNameSuffix = 'Порталы_Материалы';
+                    break;
+                case 'portal_labor':
+                    selector = '.labor-table';
+                    fileNameSuffix = 'Порталы_Трудозатраты';
+                    break;
+                case 'portal_all':
+                    selector = '.main-table, .labor-table';
+                    fileNameSuffix = 'Порталы_Все';
+                    break;
+                case 'all':
+                default:
+                    selector = '.export-table';
+                    fileNameSuffix = 'Полная_Спецификация';
+                    break;
+            }
+
+            const tables = document.querySelectorAll(selector);
+
+            if (tables.length === 0) {
+                alert('Нет доступных таблиц для выгрузки по выбранным критериям.');
+                return;
+            }
+
+            tables.forEach((table, index) => {
+                let ws = XLSX.utils.table_to_sheet(table);
+                let sheetName = table.getAttribute('data-sheet-name') || `Лист_${index + 1}`;
+                sheetName = sheetName.substring(0, 31).replace(/[\\/?*\[\]]/g, ''); 
+                XLSX.utils.book_append_sheet(wb, ws, sheetName);
+            });
+
+            XLSX.writeFile(wb, `Заказ_N{{ order.id }}_${fileNameSuffix}.xlsx`);
+        } catch (error) {
+            console.error("Ошибка при генерации Excel: ", error);
+            alert('Произошла ошибка при формировании Excel файла.');
+        }
+    }
+</script>
+{% endblock %}

@@ -17,7 +17,7 @@
         {% if user.profile.is_director %}
           <a href="{% url "users:admin_user_list" %}" class="btn m-2">Пользователи</a>
           <a href="{% url "users:register" %}" class="btn m-2">Создать пользователя</a>
-          {% comment %} <a href="{% url "orders:orders" %}" class="btn m-2">Заказы</a> {% endcomment %}
+          <a href="{% url "orders:orders_list" %}" class="btn m-2">Заказы</a>
         {% endif %}
       {% endif %}
       <div class="justify-content-end collapse navbar-collapse" id="navbarSupportedContent">

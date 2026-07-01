@@ -34,6 +34,13 @@ class GlukharOrderView(LoginRequiredMixin, View):
 
         glukhars = data.get("glukhars", [])
         calc_result = calculate_glukhar(glukhars)
+
+        ratio_obj = ProfitRatio.objects.get(name="glukhar")
+        calc_result["profit_ratio"] = float(ratio_obj.ratio)
+
+        if request.user.profile.is_manager:
+            calc_result["dealer_percent"] = request.user.percentage_sale
+        print(calc_result)
         return JsonResponse(calc_result)
 
 
@@ -65,7 +72,7 @@ class SaveGlukharOrderView(LoginRequiredMixin, View):
                 installation=installation,
                 unloading=unloading,
                 discount=discount,
-                dealer=request.user,
+                creator=request.user,
                 buyer=buyer,
             )
 
@@ -105,13 +112,20 @@ class PortalOrderView(LoginRequiredMixin, View):
             "profit_ratio": profit_ratio,
             "schemes_json": dumps(schemes),
         }
-        return render(request, "calculate/portal_order.html", context)
+        return render(request, "calculate/portal.html", context)
 
     def post(self, request, *args, **kwargs):
         data = loads(request.body)
 
         portals = data.get("portals", [])
         calc_result = calculate_portals(portals)
+
+        ratio_obj = ProfitRatio.objects.get(name="portal")
+        calc_result["profit_ratio"] = float(ratio_obj.ratio)
+
+        if request.user.profile.is_manager:
+            calc_result["dealer_percent"] = request.user.percentage_sale
+
         return JsonResponse(calc_result)
 
 
@@ -143,7 +157,7 @@ class PortalOrderSaveView(LoginRequiredMixin, View):
                 installation=installation,
                 unloading=unloading,
                 discount=discount,
-                dealer=request.user,
+                creator=request.user,
                 buyer=buyer,
             )
 

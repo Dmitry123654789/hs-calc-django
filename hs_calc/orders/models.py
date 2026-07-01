@@ -1,4 +1,5 @@
 from django.db.models import (
+    BooleanField,
     CASCADE,
     DateTimeField,
     DecimalField,
@@ -30,7 +31,7 @@ class Order(Model):
         default=0,
         verbose_name="Скидка",
     )
-    dealer = ForeignKey(
+    creator = ForeignKey(
         users.models.CustomUser,
         on_delete=CASCADE,
     )
@@ -39,5 +40,8 @@ class Order(Model):
         on_delete=SET_NULL,
         null=True,
         blank=True,
+    )
+    is_finished = BooleanField(
+        default=False,
     )
     created_at = DateTimeField(auto_now_add=True)

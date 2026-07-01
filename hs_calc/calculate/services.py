@@ -618,7 +618,6 @@ def calculate_beams(
         )
         * amount
     )
-
     return workpiece, work_data, portal_total
 
 
@@ -632,6 +631,8 @@ def calculate_portals(portals: list) -> dict:
             "workpiece": workpiece,
             "work_data": work_data,
             "portal_total": portal_total,
+            "type": "portal",
+            "N": portal["amount"],
         }
         total_price += portal_total
 
