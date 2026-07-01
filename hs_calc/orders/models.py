@@ -14,34 +14,39 @@ import users.models
 
 class Order(Model):
     delivery = PositiveIntegerField(
-        default=False,
         verbose_name="Доставка",
     )
     installation = PositiveIntegerField(
-        default=False,
         verbose_name="Монтаж",
+        default=False,
     )
     unloading = PositiveIntegerField(
-        default=False,
         verbose_name="Разгрузка",
+        default=False,
     )
     discount = DecimalField(
+        verbose_name="Скидка",
         max_digits=10,
         decimal_places=2,
         default=0,
-        verbose_name="Скидка",
     )
     creator = ForeignKey(
         users.models.CustomUser,
         on_delete=CASCADE,
+        verbose_name="Создатель",
     )
     buyer = ForeignKey(
         users.models.Buyer,
         on_delete=SET_NULL,
         null=True,
         blank=True,
+        verbose_name="Покупатель",
     )
     is_finished = BooleanField(
+        verbose_name="Завершен",
         default=False,
     )
-    created_at = DateTimeField(auto_now_add=True)
+    created_at = DateTimeField(
+        verbose_name="Дата создания",
+        auto_now_add=True,
+    )

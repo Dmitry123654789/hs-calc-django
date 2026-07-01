@@ -9,7 +9,6 @@ class CustomUser(auth_models.AbstractUser):
         verbose_name="почта",
         unique=True,
     )
-
     REQUIRED_FIELDS = ["email"]
 
     def __str__(self):
@@ -18,29 +17,26 @@ class CustomUser(auth_models.AbstractUser):
 
 class Buyer(django.db.models.Model):
     phone = phonenumber_field.modelfields.PhoneNumberField(
-        "телефон",
+        verbose_name="телефон",
         unique=True,
         blank=True,
         null=True,
         region="RU",
     )
-
     email = django.db.models.EmailField(
-        "почта",
+        verbose_name="почта",
         unique=True,
         blank=True,
         null=True,
     )
-
     first_name = django.db.models.CharField(
-        "Имя",
+        verbose_name="Имя",
         max_length=150,
         blank=True,
         null=True,
     )
-
     last_name = django.db.models.CharField(
-        "Фамилия",
+        verbose_name="Фамилия",
         max_length=150,
         blank=True,
         null=True,
@@ -59,23 +55,20 @@ class Profile(django.db.models.Model):
         related_name="profile",
         verbose_name="пользователь",
     )
-
     role = django.db.models.CharField(
-        "роль",
+        verbose_name="роль",
         max_length=100,
         choices=Role.choices,
         default=Role.GROUP_MANAGER,
     )
-
     phone = phonenumber_field.modelfields.PhoneNumberField(
-        "телефон",
+        verbose_name="телефон",
         blank=True,
         null=True,
         region="RU",
     )
-
     percentage_sale = django.db.models.IntegerField(
-        "процент с продажи",
+        verbose_name="процент с продажи",
         blank=True,
         null=True,
         default=0,
