@@ -1,8 +1,8 @@
-import django.apps
-import django.db.models.signals
+from django.apps import AppConfig
+from django.db.models.signals import post_save
 
 
-class UsersConfig(django.apps.AppConfig):
+class UsersConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "users"
     verbose_name = "Пользователи"
@@ -12,7 +12,7 @@ class UsersConfig(django.apps.AppConfig):
         import users.signals
 
         user = get_user_model()
-        django.db.models.signals.post_save.connect(
+        post_save.connect(
             users.signals.create_user_profile,
             sender=user,
         )

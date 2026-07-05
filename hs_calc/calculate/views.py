@@ -40,7 +40,7 @@ class GlukharOrderView(LoginRequiredMixin, View):
 
         if request.user.profile.is_manager:
             calc_result["dealer_percent"] = request.user.percentage_sale
-        print(calc_result)
+
         return JsonResponse(calc_result)
 
 

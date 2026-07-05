@@ -1,4 +1,4 @@
-import users.models
+from users.models import Profile
 
 
 def create_user_profile(sender, instance, created, **kwargs):
@@ -6,4 +6,4 @@ def create_user_profile(sender, instance, created, **kwargs):
         return
 
     if created:
-        users.models.Profile.objects.create(user=instance)
+        Profile.objects.create(user=instance)

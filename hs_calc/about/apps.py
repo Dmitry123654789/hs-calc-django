@@ -1,7 +1,7 @@
-import django.apps
+from django.apps import AppConfig
 
 
-class AboutConfig(django.apps.AppConfig):
+class AboutConfig(AppConfig):
     default_auto_field = "django.db.models.BigAutoField"
     name = "about"
-    verbose_name = "опроекте"
+    verbose_name = "о проекте"

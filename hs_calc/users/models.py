@@ -1,11 +1,11 @@
-import django.conf
-import django.contrib.auth.models as auth_models
-import django.db.models
-import phonenumber_field.modelfields
+from django.conf import settings
+from django.contrib.auth.models import AbstractUser
+from django.db import models
+from phonenumber_field.modelfields import PhoneNumberField
 
 
-class CustomUser(auth_models.AbstractUser):
-    email = django.db.models.EmailField(
+class CustomUser(AbstractUser):
+    email = models.EmailField(
         verbose_name="почта",
         unique=True,
     )
@@ -15,27 +15,27 @@ class CustomUser(auth_models.AbstractUser):
         return self.username
 
 
-class Buyer(django.db.models.Model):
-    phone = phonenumber_field.modelfields.PhoneNumberField(
+class Buyer(models.Model):
+    phone = PhoneNumberField(
         verbose_name="телефон",
         unique=True,
         blank=True,
         null=True,
         region="RU",
     )
-    email = django.db.models.EmailField(
+    email = models.EmailField(
         verbose_name="почта",
         unique=True,
         blank=True,
         null=True,
     )
-    first_name = django.db.models.CharField(
+    first_name = models.CharField(
         verbose_name="Имя",
         max_length=150,
         blank=True,
         null=True,
     )
-    last_name = django.db.models.CharField(
+    last_name = models.CharField(
         verbose_name="Фамилия",
         max_length=150,
         blank=True,
@@ -43,31 +43,31 @@ class Buyer(django.db.models.Model):
     )
 
 
-class Profile(django.db.models.Model):
-    class Role(django.db.models.TextChoices):
+class Profile(models.Model):
+    class Role(models.TextChoices):
         MAIN_MANAGER = "admin", "Администратор"
         GROUP_MANAGER = "dealer", "Дилер"
         WORKER = "carpenter", "Столяр"
 
-    user = django.db.models.OneToOneField(
-        django.conf.settings.AUTH_USER_MODEL,
-        on_delete=django.db.models.CASCADE,
+    user = models.OneToOneField(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.CASCADE,
         related_name="profile",
         verbose_name="пользователь",
     )
-    role = django.db.models.CharField(
+    role = models.CharField(
         verbose_name="роль",
         max_length=100,
         choices=Role.choices,
         default=Role.GROUP_MANAGER,
     )
-    phone = phonenumber_field.modelfields.PhoneNumberField(
+    phone = PhoneNumberField(
         verbose_name="телефон",
         blank=True,
         null=True,
         region="RU",
     )
-    percentage_sale = django.db.models.IntegerField(
+    percentage_sale = models.IntegerField(
         verbose_name="процент с продажи",
         blank=True,
         null=True,

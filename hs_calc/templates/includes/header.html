@@ -16,6 +16,7 @@
         {% endif %}
         {% if user.profile.is_director %}
           <a href="{% url "users:admin_user_list" %}" class="btn m-2">Пользователи</a>
+          <a href="{% url "users:buyers_list" %}" class="btn m-2">Покупатели</a>
           <a href="{% url "users:register" %}" class="btn m-2">Создать пользователя</a>
           <a href="{% url "orders:orders_list" %}" class="btn m-2">Заказы</a>
         {% endif %}

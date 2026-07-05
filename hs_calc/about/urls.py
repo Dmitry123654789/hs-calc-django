@@ -1,15 +1,15 @@
-import django.urls
+from django.urls import path
 
-import about.views
+from about.views import DescriptionView
 
 
 app_name = "about"
 
 
 urlpatterns = [
-    django.urls.path(
+    path(
         "",
-        about.views.DescriptionView.as_view(),
+        DescriptionView.as_view(),
         name="home",
     ),
 ]

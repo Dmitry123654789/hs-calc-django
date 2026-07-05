@@ -9,7 +9,7 @@ from django.db.models import (
     SET_NULL,
 )
 
-import users.models
+from users.models import Buyer, CustomUser
 
 
 class Order(Model):
@@ -31,12 +31,12 @@ class Order(Model):
         default=0,
     )
     creator = ForeignKey(
-        users.models.CustomUser,
+        CustomUser,
         on_delete=CASCADE,
         verbose_name="Создатель",
     )
     buyer = ForeignKey(
-        users.models.Buyer,
+        Buyer,
         on_delete=SET_NULL,
         null=True,
         blank=True,

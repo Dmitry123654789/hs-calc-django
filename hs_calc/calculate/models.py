@@ -10,7 +10,7 @@ from django.db.models import (
     TextChoices,
 )
 
-import orders.models
+from orders.models import Order
 
 
 class Scheme(Model):
@@ -178,7 +178,7 @@ class BaseProduct(Model):
         default=False,
     )
     order = ForeignKey(
-        orders.models.Order,
+        Order,
         on_delete=PROTECT,
         verbose_name="Заказ",
     )

@@ -1,39 +1,38 @@
-import django.contrib.auth.forms
-import django.db.transaction
-import django.forms
-import phonenumber_field.formfields
+from django import forms
+from django.contrib.auth.forms import AuthenticationForm, PasswordChangeForm
+from django.db import transaction
+from phonenumber_field.formfields import PhoneNumberField
 
-import users.models
+from users.models import Buyer, CustomUser, Profile
 
 
-class CustomUserCreationForm(django.forms.ModelForm):
-    role = django.forms.ChoiceField(
-        choices=users.models.Profile.Role.choices,
+class CustomUserCreationForm(forms.ModelForm):
+    role = forms.ChoiceField(
+        choices=Profile.Role.choices,
         label="Роль",
-        initial=users.models.Profile.Role.GROUP_MANAGER,
-        widget=django.forms.Select(attrs={"class": "form-select"}),
+        initial=Profile.Role.GROUP_MANAGER,
     )
 
-    phone = phonenumber_field.formfields.PhoneNumberField(
+    phone = PhoneNumberField(
         label="Телефон",
         required=False,
         region="RU",
     )
 
-    percentage_sale = django.forms.IntegerField(
-        label="Процент_с_продажи",
+    percentage_sale = forms.IntegerField(
+        label="Процент с продажи",
         required=False,
         initial=10,
-        widget=django.forms.NumberInput(attrs={"min": 0, "max": 100}),
+        min_value=0,
+        max_value=100,
     )
 
-    password1 = django.forms.CharField(
+    password1 = forms.CharField(
         label="Пароль",
-        widget=django.forms.PasswordInput(attrs={"class": "form-control"}),
     )
 
     class Meta:
-        model = users.models.CustomUser
+        model = CustomUser
         fields = (
             "username",
             "email",
@@ -43,11 +42,10 @@ class CustomUserCreationForm(django.forms.ModelForm):
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields["username"].label = "Имя_пользователя"
-        self.fields["password1"].label = "Пароль"
+        self.fields["username"].label = "Имя пользователя"
 
     def save(self, commit=True):
-        with django.db.transaction.atomic():
+        with transaction.atomic():
             user = super().save(commit=False)
             user.set_password(self.cleaned_data["password1"])
 
@@ -71,43 +69,49 @@ class CustomUserCreationForm(django.forms.ModelForm):
             return user
 
 
-class CustomAuthenticationForm(django.contrib.auth.forms.AuthenticationForm):
-    username = django.forms.CharField(
+class CustomAuthenticationForm(AuthenticationForm):
+    username = forms.CharField(
         label="Имя_пользователя",
-        widget=django.forms.TextInput(attrs={"autofocus": True}),
+        widget=forms.TextInput(attrs={"autofocus": True}),
     )
-    password = django.forms.CharField(
+    password = forms.CharField(
         label="Пароль",
         strip=False,
-        widget=django.forms.PasswordInput(
+        widget=forms.PasswordInput(
             attrs={"autocomplete": "current-password"},
         ),
     )
 
     error_messages = {
-        "invalid_login": "Пожалуйста,_введите_правильные_имя_пользователя_и_пароль.",
+        "invalid_login": "Пожалуйста, введите правильные имя пользователя и пароль.",
     }
 
 
-class CustomPasswordChangeForm(django.contrib.auth.forms.PasswordChangeForm):
-    old_password = django.forms.CharField(
+class CustomPasswordChangeForm(PasswordChangeForm):
+    old_password = forms.CharField(
         label="Старый_пароль",
         strip=False,
-        widget=django.forms.PasswordInput(
+        widget=forms.PasswordInput(
             attrs={"autocomplete": "current-password", "autofocus": True},
         ),
     )
-    new_password1 = django.forms.CharField(
+    new_password1 = forms.CharField(
         label="Новый_пароль",
-        widget=django.forms.PasswordInput(
+        widget=forms.PasswordInput(
             attrs={"autocomplete": "new-password"},
         ),
         strip=False,
     )
-    new_password2 = django.forms.CharField(
+    new_password2 = forms.CharField(
         label="Подтверждение_нового_пароля",
         strip=False,
-        widget=django.forms.PasswordInput(
+        widget=forms.PasswordInput(
             attrs={"autocomplete": "new-password"},
         ),
     )
+
+
+class BuyerForm(forms.ModelForm):
+    class Meta:
+        model = Buyer
+        fields = ("first_name", "last_name", "phone", "email")

@@ -25,3 +25,7 @@ class OrderDetailView(DetailView):
         context["portals"] = self.object.portal_set.all()
         context["glukhars"] = self.object.glukhar_set.all()
         return context
+
+
+class OrderEditView(DetailView):
+    pass

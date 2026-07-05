@@ -1,5 +1,5 @@
-import django.views.generic
+from django.views.generic import TemplateView
 
 
-class DescriptionView(django.views.generic.TemplateView):
+class DescriptionView(TemplateView):
     template_name = "about/home.html"

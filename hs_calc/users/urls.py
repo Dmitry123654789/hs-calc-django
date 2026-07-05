@@ -1,44 +1,57 @@
-__all__ = ()
-
-import django.urls
+from django.urls import path
 
 from users import views
 
 app_name = "users"
 
 urlpatterns = [
-    django.urls.path("login/", views.LoginView.as_view(), name="login"),
-    django.urls.path("logout/", views.LogoutView.as_view(), name="logout"),
-    django.urls.path("profile/", views.ProfileView.as_view(), name="profile"),
-    django.urls.path(
+    path("login/", views.LoginView.as_view(), name="login"),
+    path("logout/", views.LogoutView.as_view(), name="logout"),
+    path("profile/", views.ProfileView.as_view(), name="profile"),
+    path(
         "register/",
         views.RegisterView.as_view(),
         name="register",
     ),
-    django.urls.path(
+    path(
         "password-change/",
         views.PasswordChangeView.as_view(),
         name="password_change",
     ),
-    django.urls.path(
+    path(
         "password-change/done/",
         views.PasswordChangeDoneView.as_view(),
         name="password_change_done",
     ),
-    django.urls.path(
+    path(
         "admin/users/",
         views.AdminUserListView.as_view(),
         name="admin_user_list",
     ),
-    django.urls.path(
+    path(
         "admin/users/<int:pk>/",
         views.AdminUserDetailView.as_view(),
         name="admin_user_detail",
     ),
-    django.urls.path(
+    path(
         "admin/users/<int:pk>/delete/",
         views.AdminUserDeleteView.as_view(),
         name="admin_user_delete",
     ),
-    django.urls.path("api/buyers/", views.BuyerListView.as_view(), name="buyers_list"),
+    path(
+        "api/buyers/",
+        views.BuyerListView.as_view(),
+        name="api_buyers_list",
+    ),
+    path("buyers/", views.BuyerListCreateView.as_view(), name="buyers_list"),
+    path(
+        "buyers/<int:pk>/",
+        views.BuyerDetailView.as_view(),
+        name="buyer_detail",
+    ),
+    path(
+        "buyers/<int:pk>/delete/",
+        views.BuyerDeleteView.as_view(),
+        name="buyer_delete",
+    ),
 ]

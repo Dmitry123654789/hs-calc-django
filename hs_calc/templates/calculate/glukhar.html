@@ -135,7 +135,7 @@
         }
 
         // 1. Загрузка списка покупателей
-        fetch('{% url "users:buyers_list" %}')
+        fetch('{% url "users:api_buyers_list" %}')
             .then(res => res.json())
             .then(buyers => {
                 buyers.forEach(b => {
