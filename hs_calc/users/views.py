@@ -19,6 +19,7 @@ from django.views.generic import (
 )
 from django.views.generic.edit import FormMixin
 
+from core.mixins import AdminRequiredMixin
 from orders.models import Order
 from users.forms import (
     BuyerForm,
@@ -26,7 +27,6 @@ from users.forms import (
     CustomPasswordChangeForm,
     CustomUserCreationForm,
 )
-from users.mixins import AdminRequiredMixin
 from users.models import Buyer, CustomUser, Profile
 
 

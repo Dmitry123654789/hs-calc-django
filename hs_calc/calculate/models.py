@@ -128,6 +128,9 @@ class PortalWood(Model):
     class Meta:
         db_table = "calculate_portal_wood"
 
+    def __str__(self):
+        return self.name.capitalize()
+
 
 class ProfitRatio(Model):
     name = CharField(

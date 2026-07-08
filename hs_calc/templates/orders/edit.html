@@ -1,0 +1,142 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Редактирование заказа №{{ order.id }}{% endblock %}
+
+{% block content %}
+  <h1 class="h3 mb-4">Заказ №{{ order.id }}</h1>
+
+  <dl class="row">
+    <dt class="col-sm-3">Покупатель</dt>
+    <dd class="col-sm-9">{{ order.buyer|default:"—" }}</dd>
+
+    <dt class="col-sm-3">Статус</dt>
+    <dd class="col-sm-9">
+      <span id="order-status-badge"
+            class="badge {% if order.is_finished %}bg-success{% else %}bg-secondary{% endif %}">
+        {% if order.is_finished %}Завершен{% else %}В работе{% endif %}
+      </span>
+    </dd>
+  </dl>
+
+  <table class="table table-hover align-middle">
+    <thead>
+      <tr>
+        <th style="width: 3rem;">№</th>
+        <th>Тип</th>
+        <th>Элемент</th>
+        <th class="text-center" style="width: 8rem;">Выполнено</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for item in items %}
+        <tr>
+          <td>{{ forloop.counter }}</td>
+          <td>{{ item.type_label }}</td>
+          <td>
+            <a href="#"
+               class="item-title"
+               data-bs-toggle="modal"
+               data-bs-target="#itemDetailsModal"
+               data-key="{{ item.key }}">
+              {{ item.title }}
+            </a>
+          </td>
+          <td class="text-center">
+            <input type="checkbox"
+                   class="form-check-input item-finished-checkbox"
+                   data-type="{{ item.type }}"
+                   data-id="{{ item.id }}"
+                   {% if item.is_finished %}checked{% endif %}>
+          </td>
+        </tr>
+      {% empty %}
+        <tr>
+          <td colspan="4" class="text-center text-muted">В заказе нет элементов</td>
+        </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+
+  <!-- Модальное окно с характеристиками элемента -->
+  <div class="modal fade" id="itemDetailsModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Характеристики</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <table class="table table-sm mb-0">
+            <tbody id="itemDetailsBody"></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </div>
+{% endblock %}
+
+{% block scripts %}
+  <script>
+    const itemDetails = {{ details_json|safe }};
+
+    function getCookie(name) {
+      const match = document.cookie.match(new RegExp("(^| )" + name + "=([^;]+)"));
+      return match ? decodeURIComponent(match[2]) : null;
+    }
+
+    document.querySelectorAll(".item-title").forEach((link) => {
+      link.addEventListener("click", (event) => {
+        event.preventDefault();
+        const key = link.dataset.key;
+        const details = itemDetails[key] || {};
+
+        const body = document.getElementById("itemDetailsBody");
+        body.innerHTML = "";
+        Object.entries(details).forEach(([label, value]) => {
+          const row = document.createElement("tr");
+          row.innerHTML = `<th class="text-muted" style="width: 50%;">${label}</th><td>${value}</td>`;
+          body.appendChild(row);
+        });
+      });
+    });
+
+    document.querySelectorAll(".item-finished-checkbox").forEach((checkbox) => {
+      checkbox.addEventListener("change", async () => {
+        const type = checkbox.dataset.type;
+        const id = checkbox.dataset.id;
+        const isFinished = checkbox.checked;
+
+        try {
+          const response = await fetch(window.location.href, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "X-CSRFToken": getCookie("csrftoken"),
+            },
+            body: JSON.stringify({ type, id, is_finished: isFinished }),
+          });
+
+          if (!response.ok) {
+            throw new Error("Ошибка запроса");
+          }
+
+          const data = await response.json();
+          const badge = document.getElementById("order-status-badge");
+          if (data.order_is_finished) {
+            badge.textContent = "Завершен";
+            badge.classList.remove("bg-secondary");
+            badge.classList.add("bg-success");
+          } else {
+            badge.textContent = "В работе";
+            badge.classList.remove("bg-success");
+            badge.classList.add("bg-secondary");
+          }
+        } catch (error) {
+          checkbox.checked = !isFinished;
+          alert("Не удалось сохранить изменение. Попробуйте еще раз.");
+        }
+      });
+    });
+  </script>
+{% endblock %}
