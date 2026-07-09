@@ -336,7 +336,7 @@
             lastPayload = payload;
             resultContainer.innerHTML = `<div class="text-center mt-4"><div class="spinner-border text-primary"></div><p class="mt-2">Выполняется расчет позиций...</p></div>`;
 
-            fetch('{% url "calculate:portal_order" %}', { 
+            fetch('{% url "orders:portal_order" %}', { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
                 body: JSON.stringify(payload)
@@ -476,7 +476,7 @@
             };
 
             try {
-                const response = await fetch('{% url "calculate:portal_order_save" %}', {
+                const response = await fetch('{% url "orders:portal_order_save" %}', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
                     body: JSON.stringify(combinedPayload)

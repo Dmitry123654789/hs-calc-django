@@ -20,3 +20,26 @@ input::-webkit-inner-spin-button {
 input[type="number"] {
     -moz-appearance: textfield;
 }
+
+.header-btn {
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.header-btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 0.25rem 0.5rem rgba(0, 0, 0, 0.15);
+}
+
+.header-dropdown-item {
+    border-left: 3px solid transparent;
+    transition: background-color 0.15s ease, border-color 0.15s ease, padding-left 0.15s ease;
+}
+.header-dropdown-item:hover,
+.header-dropdown-item:focus {
+    background-color: rgba(13, 110, 253, 0.08);
+    border-left-color: #0d6efd;
+    padding-left: 1.25rem;
+}
+.header-dropdown-item:hover i,
+.header-dropdown-item:focus i {
+    color: #0d6efd;
+}

@@ -250,7 +250,7 @@
 
             const csrfToken = document.querySelector('[name=csrfmiddlewaretoken]').value;
             
-            fetch('{% url "calculate:glukhar_order" %}', { 
+            fetch('{% url "orders:glukhar_order" %}', { 
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': csrfToken },
                 body: JSON.stringify(payload)
@@ -448,7 +448,7 @@
             };
 
             try {
-                const response = await fetch('{% url "calculate:glukhar_order_save" %}', {
+                const response = await fetch('{% url "orders:glukhar_order_save" %}', {
                     method: 'POST',
                     headers: { 
                         'Content-Type': 'application/json',
