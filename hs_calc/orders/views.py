@@ -169,7 +169,7 @@ class OrderFormView(ManagerRequiredMixin, View):
             "glukhar_profit_ratio": glukhar_ratio,
             "schemes_json": dumps(schemes),
         }
-        return render(request, "orders/order_form.html", context)
+        return render(request, "orders/combined_order_form.html", context)
 
 
 class CombinedOrderSaveView(ManagerRequiredMixin, View):

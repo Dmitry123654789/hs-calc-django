@@ -1,0 +1,767 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Формирование заказа{% endblock %}
+
+{% block content %}
+<div class="container">
+    <h2 class="mb-4">Формирование заказа</h2>
+
+    <!-- Индикатор шагов -->
+    <div class="d-flex justify-content-between mb-4 wizard-steps">
+        <div class="step-indicator flex-fill text-center" data-step="1">
+            <div class="step-circle mx-auto">1</div>
+            <div class="small mt-1">Покупатель</div>
+        </div>
+        <div class="step-indicator flex-fill text-center" data-step="2">
+            <div class="step-circle mx-auto">2</div>
+            <div class="small mt-1">Порталы</div>
+        </div>
+        <div class="step-indicator flex-fill text-center" data-step="3">
+            <div class="step-circle mx-auto">3</div>
+            <div class="small mt-1">Глухари</div>
+        </div>
+        <div class="step-indicator flex-fill text-center" data-step="4">
+            <div class="step-circle mx-auto">4</div>
+            <div class="small mt-1">Итог</div>
+        </div>
+    </div>
+
+    <form id="orderForm" onsubmit="return false;">
+        {% csrf_token %}
+
+        <!-- ШАГ 1: ПОКУПАТЕЛЬ -->
+        <div class="wizard-pane" data-pane="1">
+            <div class="card mb-4 bg-light shadow-sm">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-12">
+                            <label class="form-label fw-bold">👤 Покупатель:</label>
+                            <select id="buyerSelect" class="form-select">
+                                <option value="null">-- Без покупателя --</option>
+                                <option value="new">+ Новый покупатель</option>
+                            </select>
+                        </div>
+                        <div class="col-12" id="newBuyerFields" style="display: none;">
+                            <div class="row g-2">
+                                <div class="col-md-3"><input type="text" id="buyerFirstName" class="form-control" placeholder="Имя"></div>
+                                <div class="col-md-3"><input type="text" id="buyerLastName" class="form-control" placeholder="Фамилия"></div>
+                                <div class="col-md-3"><input type="text" id="buyerPhone" class="form-control" placeholder="Телефон"></div>
+                                <div class="col-md-3"><input type="email" id="buyerEmail" class="form-control" placeholder="Email"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ШАГ 2: ПОРТАЛЫ -->
+        <div class="wizard-pane" data-pane="2" style="display: none;">
+            <div id="portalContainer" class="row"></div>
+            <button type="button" class="btn btn-outline-primary" id="addPortalBtn">
+                <i class="bi bi-plus-circle"></i> Добавить портал
+            </button>
+        </div>
+
+        <!-- ШАГ 3: ГЛУХАРИ -->
+        <div class="wizard-pane" data-pane="3" style="display: none;">
+            <div class="card mb-4 bg-light shadow-sm">
+                <div class="card-body">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">🌲 Материал:</label>
+                            <select name="material" id="glukharMaterial" class="form-select">
+                                <option value="сосна">Сосна</option>
+                                <option value="дуб">Дуб</option>
+                                <option value="лиственница">Лиственница</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label fw-bold">🖌 Покраска:</label>
+                            <select name="color" id="glukharColor" class="form-select">
+                                <option value="RAL">RAL</option>
+                                <option value="Лесс">Лесс</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div id="glukharContainer" class="row"></div>
+            <button type="button" class="btn btn-outline-primary" id="addGlukharBtn">
+                <i class="bi bi-plus-circle"></i> Добавить глухарь
+            </button>
+        </div>
+
+        <!-- ШАГ 4: ИТОГ -->
+        <div class="wizard-pane" data-pane="4" style="display: none;">
+            <div id="resultsContainer" class="mt-2"></div>
+        </div>
+
+        <!-- НАВИГАЦИЯ -->
+        <div class="d-flex flex-wrap gap-3 mt-4 mb-5 align-items-center">
+            <button type="button" class="btn btn-outline-secondary" id="backBtn" style="display: none;">← Назад</button>
+            <div class="ms-auto d-flex gap-3">
+                <button type="button" class="btn btn-outline-warning" id="skipBtn" style="display: none;">Пропустить</button>
+                <button type="button" class="btn btn-success btn-lg" id="nextBtn">Далее →</button>
+                <button type="button" class="btn btn-primary btn-lg" id="saveOrderBtn" style="display: none;">Сохранить заказ в базу</button>
+            </div>
+        </div>
+    </form>
+</div>
+
+<template id="portalCardTemplate">
+    <div class="col-xl-6 col-12 mb-4 portal-card-wrapper">
+        <div class="card h-100 shadow-sm portal-card border-secondary">
+            <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
+                <span class="fw-bold portal-title">Портал #1</span>
+                <button type="button" class="btn-close btn-close-white remove-portal-btn" aria-label="Удалить" title="Удалить эту позицию"></button>
+            </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-5 border-end">
+                        <h6 class="fw-bold text-primary mb-2">⚙️ Размеры и опции</h6>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 fw-semibold">Ширина (мм)</label>
+                            <input type="number" class="form-control form-control-sm p-width" required min="1200" max="15000" value="2000">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 fw-semibold">Высота (мм)</label>
+                            <input type="number" class="form-control form-control-sm p-height" required min="2100" max="3000" value="2100">
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 fw-semibold">Количество (шт)</label>
+                            <input type="number" class="form-control form-control-sm p-amount" required min="1" value="1">
+                        </div>
+                        <div class="mb-3">
+                            <div class="form-check form-switch pt-2">
+                                <input class="form-check-input p-rain" type="checkbox">
+                                <label class="form-check-label small fw-semibold">Защита от дождя</label>
+                            </div>
+                        </div>
+
+                        <h6 class="fw-bold text-primary mb-2 pt-2 border-top">🪵 Спецификация</h6>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Тип дерева</label>
+                            <select class="form-select form-select-sm p-wood" required>
+                                <option value="Сосна">Сосна</option>
+                                <option value="Лиственница">Лиственница</option>
+                                <option value="Дуб">Дуб</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Цвет</label>
+                            <select class="form-select form-select-sm p-color" required>
+                                <option value="RAL">RAL</option>
+                                <option value="Лесс">Лесс</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Модель ручки</label>
+                            <select class="form-select form-select-sm p-hardware" required>
+                                <option value="Standard">Односторонняя</option>
+                                <option value="Standard+">Двусторонняя</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Цвет ручки</label>
+                            <select class="form-select form-select-sm p-hardware-color" required>
+                                <option value="white">Белый</option>
+                                <option value="silver">Серебро</option>
+                                <option value="bronze">Бронза</option>
+                                <option value="brown">Коричневый</option>
+                            </select>
+                        </div>
+                        <div class="mb-2">
+                            <label class="form-label small mb-1 text-muted">Стеклопакет</label>
+                            <select class="form-select form-select-sm p-glazing" required>
+                                <option value="Standard">Standard</option>
+                                <option value="Standard+">Standard+</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="col-md-7">
+                        <h6 class="fw-bold text-primary mb-2">Схема открывания</h6>
+                        <div class="p-schemes-container row g-2"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<template id="glukharCardTemplate">
+    <div class="col-md-6 col-lg-4 mb-3 glukhar-card-wrapper">
+        <div class="card h-100 shadow-sm glukhar-card border-secondary">
+            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+                <span class="fw-bold glukhar-title">Глухарь #1</span>
+                <button type="button" class="btn-close btn-close-sm remove-glukhar-btn" aria-label="Удалить" title="Удалить эту позицию"></button>
+            </div>
+            <div class="card-body">
+                <div class="row g-2">
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Ширина (мм)</label>
+                        <input type="number" class="form-control form-control-sm g-width" required min="1200" value="1200" placeholder="1200">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Высота (мм)</label>
+                        <input type="number" class="form-control form-control-sm g-height" required min="2100" value="2100" placeholder="2100">
+                    </div>
+                    <div class="col-6">
+                        <label class="form-label small text-muted">Количество (шт)</label>
+                        <input type="number" class="form-control form-control-sm g-amount" required min="1" value="1">
+                    </div>
+                    <div class="col-6 d-flex align-items-end">
+                        <div class="form-check">
+                            <input class="form-check-input g-not-rect" type="checkbox">
+                            <label class="form-check-label small">Не прямоугольник</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</template>
+
+<style>
+    .step-circle {
+        width: 2.2rem;
+        height: 2.2rem;
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: #e9ecef;
+        color: #6c757d;
+        font-weight: bold;
+    }
+    .step-indicator.active .step-circle {
+        background: #198754;
+        color: #fff;
+    }
+    .step-indicator.done .step-circle {
+        background: #0d6efd;
+        color: #fff;
+    }
+</style>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+    const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
+    const portalProfitRatio = parseFloat('{{ portal_profit_ratio }}') || 1.0;
+    const glukharProfitRatio = parseFloat('{{ glukhar_profit_ratio }}') || 1.0;
+
+    const form = document.getElementById('orderForm');
+    const buyerSelect = document.getElementById('buyerSelect');
+    const newBuyerFields = document.getElementById('newBuyerFields');
+
+    const portalContainer = document.getElementById('portalContainer');
+    const portalTemplate = document.getElementById('portalCardTemplate');
+    const addPortalBtn = document.getElementById('addPortalBtn');
+
+    const glukharContainer = document.getElementById('glukharContainer');
+    const glukharTemplate = document.getElementById('glukharCardTemplate');
+    const addGlukharBtn = document.getElementById('addGlukharBtn');
+
+    const resultsContainer = document.getElementById('resultsContainer');
+
+    const backBtn = document.getElementById('backBtn');
+    const skipBtn = document.getElementById('skipBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const saveOrderBtn = document.getElementById('saveOrderBtn');
+
+    const TOTAL_STEPS = 4;
+    let currentStep = 1;
+    let portalIdCounter = 0;
+    let glukharIdCounter = 0;
+
+    // Итоговые данные, накопленные по шагам
+    let portalsPayload = [];
+    let glukharsPayload = [];
+    let portalCalcResult = null;
+    let glukharCalcResult = null;
+    let portalArea = 0;
+    let glukharArea = 0;
+
+    // ---------- Вспомогательные функции ----------
+    function showAlert(message, type = 'danger') {
+        document.querySelectorAll('.custom-alert').forEach(el => el.remove());
+        const alertDiv = document.createElement('div');
+        alertDiv.className = `alert alert-${type} mt-4 custom-alert alert-dismissible fade show shadow-sm`;
+        alertDiv.role = 'alert';
+        alertDiv.innerHTML = `
+            <strong>${type === 'danger' ? 'Ошибка!' : 'Внимание!'}</strong> ${message}
+            <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+        `;
+        document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').children[1]);
+        alertDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        setTimeout(() => {
+            alertDiv.classList.remove('show');
+            setTimeout(() => alertDiv.remove(), 150);
+        }, 10000);
+    }
+
+    function getCsrfToken() {
+        return document.querySelector('[name=csrfmiddlewaretoken]').value;
+    }
+
+    // Загрузка покупателей
+    fetch('{% url "users:api_buyers_list" %}')
+        .then(res => res.json())
+        .then(buyers => {
+            buyers.forEach(b => {
+                const opt = document.createElement('option');
+                opt.value = b.id;
+                let name = `${b.first_name || ''} ${b.last_name || ''}`.trim() || 'Без имени';
+                opt.textContent = `${name} (${b.phone || b.email || 'Нет контактов'})`;
+                buyerSelect.appendChild(opt);
+            });
+        });
+
+    buyerSelect.addEventListener('change', function () {
+        newBuyerFields.style.display = this.value === 'new' ? 'block' : 'none';
+    });
+
+    // ---------- Шаг "Порталы": карточки ----------
+    function updateCardSchemesAvailability(cardWrapper) {
+        const width = parseInt(cardWrapper.querySelector('.p-width').value) || 0;
+        cardWrapper.querySelectorAll('.scheme-item').forEach(item => {
+            const min = parseInt(item.getAttribute('data-min'));
+            const max = parseInt(item.getAttribute('data-max'));
+            const radio = item.querySelector('.scheme-radio');
+            const inRange = width >= min && width <= max;
+            radio.disabled = !inRange;
+            if (!inRange && radio.checked) radio.checked = false;
+            item.classList.toggle('opacity-50', !inRange);
+            item.classList.toggle('bg-light', !inRange);
+            item.style.pointerEvents = inRange ? 'auto' : 'none';
+        });
+    }
+
+    function addPortalCard() {
+        portalIdCounter++;
+        const clone = portalTemplate.content.cloneNode(true);
+        const cardWrapper = clone.querySelector('.portal-card-wrapper');
+        cardWrapper.querySelector('.portal-title').textContent = `Портал #${portalIdCounter}`;
+
+        cardWrapper.querySelector('.remove-portal-btn').addEventListener('click', function () {
+            cardWrapper.remove();
+            renumberPortalCards();
+        });
+
+        const schemesContainer = cardWrapper.querySelector('.p-schemes-container');
+        schemesData.forEach(scheme => {
+            const schemeItem = document.createElement('div');
+            schemeItem.className = 'col-sm-6 scheme-item p-2 border rounded text-center d-flex flex-column justify-content-center align-items-center position-relative border-dark';
+            schemeItem.setAttribute('data-min', scheme.min_size);
+            schemeItem.setAttribute('data-max', scheme.max_size);
+            schemeItem.style.cursor = 'pointer';
+            schemeItem.innerHTML = `
+                <input type="radio" name="scheme_radio_${portalIdCounter}" value="${scheme.name}" class="form-check-input scheme-radio position-absolute top-0 start-0 m-2" required>
+                <span class="fw-bold small text-dark">Схема ${scheme.name}</span>
+                <span class="text-muted" style="font-size: 0.75rem;">${scheme.min_size} - ${scheme.max_size} мм</span>`;
+            schemeItem.addEventListener('click', () => {
+                const radio = schemeItem.querySelector('.scheme-radio');
+                if (!radio.disabled) radio.checked = true;
+            });
+            schemesContainer.appendChild(schemeItem);
+        });
+
+        cardWrapper.querySelector('.p-width').addEventListener('input', () => updateCardSchemesAvailability(cardWrapper));
+        portalContainer.appendChild(cardWrapper);
+        updateCardSchemesAvailability(cardWrapper);
+    }
+
+    function renumberPortalCards() {
+        portalContainer.querySelectorAll('.portal-card-wrapper').forEach((card, index) => {
+            card.querySelector('.portal-title').textContent = `Портал #${index + 1}`;
+        });
+    }
+
+    addPortalBtn.addEventListener('click', addPortalCard);
+    addGlukharBtn.addEventListener('click', addGlukharCard);
+
+    saveOrderBtn.addEventListener('click', function () {
+        saveOrder(this);
+    });
+
+    // ---------- Шаг "Глухари": карточки ----------
+    function addGlukharCard() {
+        glukharIdCounter++;
+        const clone = glukharTemplate.content.cloneNode(true);
+        const cardWrapper = clone.querySelector('.glukhar-card-wrapper');
+        cardWrapper.querySelector('.glukhar-title').textContent = `Глухарь #${glukharIdCounter}`;
+
+        cardWrapper.querySelector('.remove-glukhar-btn').addEventListener('click', function () {
+            cardWrapper.remove();
+            renumberGlukharCards();
+        });
+
+        glukharContainer.appendChild(cardWrapper);
+    }
+
+    function renumberGlukharCards() {
+        glukharContainer.querySelectorAll('.glukhar-card-wrapper').forEach((card, index) => {
+            card.querySelector('.glukhar-title').textContent = `Глухарь #${index + 1}`;
+        });
+    }
+
+    // ---------- Сбор данных с шагов ----------
+    function collectPortals() {
+        const cards = portalContainer.querySelectorAll('.portal-card-wrapper');
+        const result = [];
+        portalArea = 0;
+
+        for (const [index, card] of cards.entries()) {
+            const width = parseFloat(card.querySelector('.p-width').value);
+            const height = parseFloat(card.querySelector('.p-height').value);
+            const amount = parseInt(card.querySelector('.p-amount').value);
+            const hasRain = card.querySelector('.p-rain').checked;
+            const woodType = card.querySelector('.p-wood').value;
+            const color = card.querySelector('.p-color').value;
+            const hardware = card.querySelector('.p-hardware').value;
+            const hardwareColor = card.querySelector('.p-hardware-color').value;
+            const glazing = card.querySelector('.p-glazing').value;
+            const schemeRadio = card.querySelector('.scheme-radio:checked');
+
+            if (!schemeRadio || !width || !height || !amount) {
+                return { error: `Заполните все поля и выберите схему для портала #${index + 1}.` };
+            }
+
+            result.push({
+                name: `portal_${index}`,
+                width, height, amount,
+                has_rain: hasRain,
+                wood_type: woodType,
+                color, hardware, glazing,
+                scheme: schemeRadio.value,
+                hardware_color: hardwareColor,
+            });
+            portalArea += (width * height / 1_000_000) * amount;
+        }
+        return { portals: result };
+    }
+
+    function collectGlukhars() {
+        const material = document.getElementById('glukharMaterial').value;
+        const color = document.getElementById('glukharColor').value;
+        const cards = glukharContainer.querySelectorAll('.glukhar-card-wrapper');
+        const result = [];
+        glukharArea = 0;
+
+        for (const [index, card] of cards.entries()) {
+            const width = parseFloat(card.querySelector('.g-width').value);
+            const height = parseFloat(card.querySelector('.g-height').value);
+            const amount = parseInt(card.querySelector('.g-amount').value);
+            const isNotRect = card.querySelector('.g-not-rect').checked;
+
+            if (!width || !height || !amount) {
+                return { error: `Заполните ширину, высоту и количество для глухаря #${index + 1}.` };
+            }
+
+            result.push({
+                name: `glukhar_${index}`,
+                width, height, amount,
+                is_not_rectangle: isNotRect,
+                material, color,
+            });
+            glukharArea += (width * height / 1_000_000) * amount;
+        }
+        return { glukhars: result };
+    }
+
+    // ---------- Расчет (шаг 4) ----------
+    async function runCalculations() {
+        resultsContainer.innerHTML = `<div class="text-center mt-4"><div class="spinner-border text-primary"></div><p class="mt-2">Выполняется расчет...</p></div>`;
+
+        saveOrderBtn.disabled = false;
+        saveOrderBtn.innerHTML = 'Сохранить заказ в базу';
+        saveOrderBtn.classList.remove('btn-secondary');
+        saveOrderBtn.classList.add('btn-primary');
+
+        portalCalcResult = null;
+        glukharCalcResult = null;
+
+        try {
+            if (portalsPayload.length) {
+                const res = await fetch('{% url "orders:portal_order" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                    body: JSON.stringify({ portals: portalsPayload }),
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                portalCalcResult = data;
+            }
+
+            if (glukharsPayload.length) {
+                const res = await fetch('{% url "orders:glukhar_order" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                    body: JSON.stringify({ glukhars: glukharsPayload }),
+                });
+                const data = await res.json();
+                if (data.error) throw new Error(data.error);
+                glukharCalcResult = data;
+            }
+
+            renderResults();
+        } catch (err) {
+            resultsContainer.innerHTML = '';
+            showAlert(`Ошибка при расчете: ${err.message}`);
+            goToStep(3);
+        }
+    }
+
+    function renderResults() {
+        const portalTotalRaw = portalCalcResult ? (portalCalcResult['ИТОГО'] || 0) : 0;
+        const glukharTotalRaw = glukharCalcResult ? (glukharCalcResult['ИТОГО'] || 0) : 0;
+
+        let html = '<h3 class="mb-3 border-bottom pb-2">📊 Результаты расчета</h3>';
+
+        if (portalsPayload.length) {
+            html += '<h5 class="mt-3">Порталы</h5><div class="row g-3 mb-3">';
+            portalsPayload.forEach((p, index) => {
+                const total = (portalCalcResult[p.name] || {}).portal_total || 0;
+                html += `<div class="col-md-6 col-lg-4">
+                    <div class="card h-100 shadow-sm border-secondary">
+                        <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between">
+                            <span>Портал #${index + 1}</span><span class="badge bg-primary">x${p.amount} шт.</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-bordered mb-0 text-center align-middle">
+                                <tbody>
+                                    <tr><td class="text-start ps-2 small">Схема / Дерево</td><td class="small">${p.scheme} / ${p.wood_type}</td></tr>
+                                    <tr><td class="text-start ps-2 small">Размер</td><td class="small">${p.width} x ${p.height} мм</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${total.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+        }
+
+        if (glukharsPayload.length) {
+            html += '<h5 class="mt-3">Глухари</h5><div class="row g-3 mb-3">';
+            glukharsPayload.forEach((g, index) => {
+                const itog = (glukharCalcResult[g.name] || {})['ИТОГО'] || {};
+                const nPrice = itog.N_price || 0;
+                html += `<div class="col-md-6 col-lg-4">
+                    <div class="card h-100 shadow-sm border-secondary">
+                        <div class="card-header bg-light fw-bold d-flex justify-content-between">
+                            <span>Глухарь #${index + 1}</span><span class="badge bg-primary">x${g.amount} шт.</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-bordered mb-0 text-center align-middle">
+                                <tbody>
+                                    <tr><td class="text-start ps-2 small">Размер</td><td class="small">${g.width} x ${g.height} мм</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${nPrice.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';
+        }
+
+        html += `
+        <div class="card mb-4 bg-light shadow-sm">
+            <div class="card-body">
+                <h5 class="card-title fw-bold mb-3">🚚 Дополнительные параметры заказа</h5>
+                <div class="row g-3">
+                    <div class="col-lg col-md-4">
+                        <label class="form-label fw-bold small">Монтаж (руб/м²)</label>
+                        <input type="number" class="form-control cost-input" id="installRate" min="0" value="12000">
+                    </div>
+                    <div class="col-lg col-md-4">
+                        <label class="form-label fw-bold small">Доставка (руб)</label>
+                        <input type="number" class="form-control cost-input" id="deliveryCost" min="0" value="50000">
+                    </div>
+                    <div class="col-lg col-md-4">
+                        <label class="form-label fw-bold small">Разгрузка (руб)</label>
+                        <input type="number" class="form-control cost-input" id="unloadingCost" min="0" value="50000">
+                    </div>
+                    <div class="col-lg col-md-6">
+                        <label class="form-label fw-bold text-danger small">Скидка (руб)</label>
+                        <input type="number" class="form-control cost-input" id="discountRate" min="0" value="0">
+                    </div>
+                </div>
+                <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0" id="dynamicGrandTotal"></div>
+            </div>
+        </div>`;
+
+        resultsContainer.innerHTML = html;
+
+        function recalcGrandTotal() {
+            const installRate = parseFloat(document.getElementById('installRate').value) || 0;
+            const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
+            const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
+            const discount = parseFloat(document.getElementById('discountRate').value) || 0;
+
+            const totalArea = portalArea + glukharArea;
+            const finalTotal = (portalTotalRaw * portalProfitRatio)
+                + (glukharTotalRaw * glukharProfitRatio)
+                + (totalArea * installRate) + delivery + unloading - discount;
+
+            document.getElementById('dynamicGrandTotal').textContent =
+                `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
+        }
+
+        document.querySelectorAll('.cost-input').forEach(inp => inp.addEventListener('input', recalcGrandTotal));
+        recalcGrandTotal();
+    }
+
+    async function saveOrder(btnElement) {
+        const config = {
+            buyer_id: buyerSelect.value,
+            installation: parseFloat(document.getElementById('installRate').value) || 0,
+            delivery: parseFloat(document.getElementById('deliveryCost').value) || 0,
+            unloading: parseFloat(document.getElementById('unloadingCost').value) || 0,
+            discount: parseInt(document.getElementById('discountRate').value) || 0,
+            portals: portalsPayload,
+            glukhars: glukharsPayload,
+        };
+
+        if (buyerSelect.value === 'new') {
+            config.buyer_data = {
+                first_name: document.getElementById('buyerFirstName').value,
+                last_name: document.getElementById('buyerLastName').value,
+                phone: document.getElementById('buyerPhone').value,
+                email: document.getElementById('buyerEmail').value,
+            };
+        }
+
+        const payload = {
+            config,
+            calculations: {
+                portals: portalCalcResult || {},
+                glukhars: glukharCalcResult || {},
+            },
+        };
+
+        btnElement.disabled = true;
+        btnElement.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
+
+        try {
+            const response = await fetch('{% url "orders:combined_order_save" %}', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                body: JSON.stringify(payload),
+            });
+            const data = await response.json();
+            if (data.status === 'success') {
+                showAlert('Заказ успешно сохранен!', 'success');
+                btnElement.innerHTML = 'Заказ сохранен';
+                btnElement.classList.replace('btn-primary', 'btn-secondary');
+            } else {
+                showAlert('Ошибка сохранения: ' + data.error);
+                btnElement.disabled = false;
+                btnElement.innerHTML = 'Сохранить заказ в базу';
+            }
+        } catch (err) {
+            showAlert('Ошибка соединения: ' + err.message);
+            btnElement.disabled = false;
+            btnElement.innerHTML = 'Сохранить заказ в базу';
+        }
+    }
+
+    // ---------- Навигация по визарду ----------
+    function goToStep(step) {
+        currentStep = step;
+
+        document.querySelectorAll('.wizard-pane').forEach(pane => {
+            pane.style.display = parseInt(pane.dataset.pane) === step ? 'block' : 'none';
+        });
+
+        document.querySelectorAll('.step-indicator').forEach(indicator => {
+            const s = parseInt(indicator.dataset.step);
+            indicator.classList.toggle('active', s === step);
+            indicator.classList.toggle('done', s < step);
+        });
+
+        // Гарантируем, что на шагах "Порталы"/"Глухари" всегда есть хотя бы одна
+        // пустая карточка для заполнения, даже если ее ранее удалили/сбросили.
+        if (step === 2 && portalContainer.children.length === 0) {
+            addPortalCard();
+        }
+        if (step === 3 && glukharContainer.children.length === 0) {
+            addGlukharCard();
+        }
+
+        backBtn.style.display = step === 1 ? 'none' : 'inline-block';
+        skipBtn.style.display = (step === 2 || step === 3) ? 'inline-block' : 'none';
+        nextBtn.style.display = step === 4 ? 'none' : 'inline-block';
+        saveOrderBtn.style.display = step === 4 ? 'inline-block' : 'none';
+        nextBtn.textContent = step === 3 ? 'Рассчитать →' : 'Далее →';
+    }
+
+    backBtn.addEventListener('click', function () {
+        if (currentStep > 1) goToStep(currentStep - 1);
+    });
+
+    function goToResultsIfPossible() {
+        if (!portalsPayload.length && !glukharsPayload.length) {
+            showAlert('Добавьте хотя бы одну позицию (портал или глухарь) перед расчетом.', 'warning');
+            goToStep(3);
+            return;
+        }
+        goToStep(4);
+        runCalculations();
+    }
+
+    skipBtn.addEventListener('click', function () {
+        if (currentStep === 2) {
+            portalContainer.innerHTML = '';
+            portalIdCounter = 0;
+            portalsPayload = [];
+            portalArea = 0;
+            goToStep(3);
+        } else if (currentStep === 3) {
+            glukharContainer.innerHTML = '';
+            glukharIdCounter = 0;
+            glukharsPayload = [];
+            glukharArea = 0;
+            goToResultsIfPossible();
+        }
+    });
+
+    nextBtn.addEventListener('click', function () {
+        if (currentStep === 1) {
+            goToStep(2);
+            return;
+        }
+
+        if (currentStep === 2) {
+            const collected = collectPortals();
+            if (collected.error) {
+                showAlert(collected.error);
+                return;
+            }
+            portalsPayload = collected.portals;
+            goToStep(3);
+            return;
+        }
+
+        if (currentStep === 3) {
+            const collected = collectGlukhars();
+            if (collected.error) {
+                showAlert(collected.error);
+                return;
+            }
+            glukharsPayload = collected.glukhars;
+            goToResultsIfPossible();
+        }
+    });
+
+    // Стартуем с одной пустой карточки на каждом шаге, для удобства
+    addPortalCard();
+    addGlukharCard();
+    goToStep(1);
+});
+</script>
+{% endblock %}

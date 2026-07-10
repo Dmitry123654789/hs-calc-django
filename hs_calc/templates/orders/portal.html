@@ -421,7 +421,7 @@
             </div>`;
             
             html += `<div class="d-flex flex-wrap gap-2 mb-5">
-                <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">Сохранить заказ в базу</button>
+                <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">Сохранить заказ</button>
             </div>`;
 
             resultContainer.innerHTML = html;
@@ -489,12 +489,12 @@
                 } else {
                     showAlert('Ошибка при сохранении: ' + data.error);
                     btnElement.disabled = false;
-                    btnElement.innerHTML = 'Сохранить заказ в базу';
+                    btnElement.innerHTML = 'Сохранить заказ';
                 }
             } catch (err) {
                 showAlert('Ошибка сети/соединения: ' + err.message);
                 btnElement.disabled = false;
-                btnElement.innerHTML = 'Сохранить заказ в базу';
+                btnElement.innerHTML = 'Сохранить заказ';
             }
         }
     });

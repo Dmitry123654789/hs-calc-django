@@ -578,7 +578,7 @@ document.addEventListener('DOMContentLoaded', function () {
             </div>
         </div>
         <div class="d-flex flex-wrap gap-2 mb-3">
-            <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">Сохранить заказ в базу</button>
+            <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">Сохранить заказ</button>
         </div>`;
 
         resultsContainer.innerHTML = html;
@@ -651,12 +651,12 @@ document.addEventListener('DOMContentLoaded', function () {
             } else {
                 showAlert('Ошибка сохранения: ' + data.error);
                 btnElement.disabled = false;
-                btnElement.innerHTML = 'Сохранить заказ в базу';
+                btnElement.innerHTML = 'Сохранить заказ';
             }
         } catch (err) {
             showAlert('Ошибка соединения: ' + err.message);
             btnElement.disabled = false;
-            btnElement.innerHTML = 'Сохранить заказ в базу';
+            btnElement.innerHTML = 'Сохранить заказ';
         }
     }
 

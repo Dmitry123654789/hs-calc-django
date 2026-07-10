@@ -20,9 +20,9 @@ urlpatterns = [
         views.PortalOrderSaveView.as_view(),
         name="portal_order_save",
     ),
-    path("order/", views.OrderFormView.as_view(), name="combined_order_form"),
+    path("combined-order/", views.OrderFormView.as_view(), name="combined_order_form"),
     path(
-        "order/save/",
+        "combined-order/save/",
         views.CombinedOrderSaveView.as_view(),
         name="combined_order_save",
     ),
