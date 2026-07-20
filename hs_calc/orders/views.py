@@ -1,3 +1,4 @@
+from decimal import Decimal, ROUND_HALF_UP
 from json import dumps, loads
 
 from django.db import transaction
@@ -20,6 +21,23 @@ from calculate.services import calculate_glukhar, calculate_portals
 from core.mixins import AdminRequiredMixin, ManagerRequiredMixin
 from orders.models import Order
 from users.models import Buyer
+
+
+def calculate_dealer_percentage_amount(user, order_total):
+    """
+    Считает сумму (в целых рублях), причитающуюся дилеру, как
+    profile.percentage_sale / 100 * order_total.
+
+    Если оформляет админ — сумма всегда 0.
+    """
+    profile = getattr(user, "profile", None)
+    if profile is None or profile.is_director:
+        return 0
+
+    percentage = Decimal(profile.percentage_sale or 0)
+    total = Decimal(str(order_total or 0))
+    amount = (percentage / Decimal("100")) * total
+    return int(amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
 
 
 def serialize_product(instance):
@@ -164,10 +182,15 @@ class OrderFormView(ManagerRequiredMixin, View):
 
         schemes = list(Scheme.objects.values("id", "name", "min_size", "max_size"))
 
+        is_admin = request.user.profile.is_director
+        dealer_percentage = 0 if is_admin else float(request.user.profile.percentage_sale or 0)
+
         context = {
             "portal_profit_ratio": portal_ratio,
             "glukhar_profit_ratio": glukhar_ratio,
             "schemes_json": dumps(schemes),
+            "is_admin": is_admin,
+            "dealer_percentage": dealer_percentage,
         }
         return render(request, "orders/combined_order_form.html", context)
 
@@ -198,6 +221,9 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
         unloading = int(config.get("unloading", 0))
         discount = int(config.get("discount", 0))
 
+        order_total = config.get("order_total", 0)
+        percentage_sale_value = calculate_dealer_percentage_amount(request.user, order_total)
+
         buyer = None
         if buyer_id not in (None, "null", "new"):
             buyer = Buyer.objects.get(id=buyer_id)
@@ -223,6 +249,9 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
                 glass_obj = Glass.objects.get(name=portal["glazing"])
                 color_type = Color.objects.get(name=portal["color"])
 
+                portal_details = dict(portal_calc_results[portal["name"]])
+                portal_details["percentage_sale"] = percentage_sale_value
+
                 Portal.objects.create(
                     width=portal["width"],
                     height=portal["height"],
@@ -235,12 +264,15 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
                     glass=glass_obj,
                     order=order,
                     amount=portal["amount"],
-                    calculation_details=portal_calc_results[portal["name"]],
+                    calculation_details=portal_details,
                 )
 
             for glukhar in glukhars:
                 wood_type = GlukharWood.objects.get(name=glukhar["material"])
                 color_type = Color.objects.get(name=glukhar["color"])
+
+                glukhar_details = dict(glukhar_calc_results[glukhar["name"]])
+                glukhar_details["percentage_sale"] = percentage_sale_value
 
                 Glukhar.objects.create(
                     width=int(glukhar["width"]),
@@ -250,7 +282,7 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
                     is_non_rectangular=glukhar["is_not_rectangle"],
                     order=order,
                     amount=glukhar["amount"],
-                    calculation_details=glukhar_calc_results[glukhar["name"]],
+                    calculation_details=glukhar_details,
                 )
 
         return JsonResponse({"status": "success", "order_id": order.id})
@@ -261,7 +293,15 @@ class GlukharOrderView(ManagerRequiredMixin, View):
         ratio_obj = ProfitRatio.objects.get(name="glukhar")
         profit_ratio = float(ratio_obj.ratio)
 
-        return render(request, "orders/glukhar.html", {"profit_ratio": profit_ratio})
+        is_admin = request.user.profile.is_director
+        dealer_percentage = 0 if is_admin else float(request.user.profile.percentage_sale or 0)
+
+        context = {
+            "profit_ratio": profit_ratio,
+            "is_admin": is_admin,
+            "dealer_percentage": dealer_percentage,
+        }
+        return render(request, "orders/glukhar.html", context)
 
     def post(self, request, *args, **kwargs):
         data = loads(request.body)
@@ -272,8 +312,8 @@ class GlukharOrderView(ManagerRequiredMixin, View):
         ratio_obj = ProfitRatio.objects.get(name="glukhar")
         calc_result["profit_ratio"] = float(ratio_obj.ratio)
 
-        if request.user.profile.is_manager:
-            calc_result["dealer_percent"] = request.user.percentage_sale
+        if not request.user.profile.is_director:
+            calc_result["dealer_percentage"] = float(request.user.profile.percentage_sale or 0)
 
         return JsonResponse(calc_result)
 
@@ -291,6 +331,9 @@ class SaveGlukharOrderView(ManagerRequiredMixin, View):
         delivery = int(config.get("delivery", 0))
         unloading = int(config.get("unloading", 0))
         discount = int(config.get("discount", 0))
+
+        order_total = config.get("order_total", 0)
+        percentage_sale_value = calculate_dealer_percentage_amount(request.user, order_total)
 
         buyer = None
         if buyer_id not in ["null", "new"]:
@@ -322,6 +365,9 @@ class SaveGlukharOrderView(ManagerRequiredMixin, View):
 
                 key = glukhar["name"]
 
+                glukhar_details = dict(calc_results[key])
+                glukhar_details["percentage_sale"] = percentage_sale_value
+
                 Glukhar.objects.create(
                     width=int(width),
                     height=int(height),
@@ -330,10 +376,10 @@ class SaveGlukharOrderView(ManagerRequiredMixin, View):
                     is_non_rectangular=is_not_rect,
                     order=order,
                     amount=amount,
-                    calculation_details=calc_results[key],
+                    calculation_details=glukhar_details,
                 )
 
-        return JsonResponse({"status": "success"})
+        return JsonResponse({"status": "success", "order_id": order.id})
 
 
 class PortalOrderView(ManagerRequiredMixin, View):
@@ -342,9 +388,15 @@ class PortalOrderView(ManagerRequiredMixin, View):
         profit_ratio = float(ratio_obj.ratio)
 
         schemes = list(Scheme.objects.values("id", "name", "min_size", "max_size"))
+
+        is_admin = request.user.profile.is_director
+        dealer_percentage = 0 if is_admin else float(request.user.profile.percentage_sale or 0)
+
         context = {
             "profit_ratio": profit_ratio,
             "schemes_json": dumps(schemes),
+            "is_admin": is_admin,
+            "dealer_percentage": dealer_percentage,
         }
         return render(request, "orders/portal.html", context)
 
@@ -357,8 +409,8 @@ class PortalOrderView(ManagerRequiredMixin, View):
         ratio_obj = ProfitRatio.objects.get(name="portal")
         calc_result["profit_ratio"] = float(ratio_obj.ratio)
 
-        if request.user.profile.is_manager:
-            calc_result["dealer_percent"] = request.user.percentage_sale
+        if not request.user.profile.is_director:
+            calc_result["dealer_percentage"] = float(request.user.profile.percentage_sale or 0)
 
         return JsonResponse(calc_result)
 
@@ -376,6 +428,9 @@ class PortalOrderSaveView(ManagerRequiredMixin, View):
         delivery = int(config.get("delivery", 0))
         unloading = int(config.get("unloading", 0))
         discount = int(config.get("discount", 0))
+
+        order_total = config.get("order_total", 0)
+        percentage_sale_value = calculate_dealer_percentage_amount(request.user, order_total)
 
         buyer = None
         if buyer_id not in ["null", "new"]:
@@ -411,6 +466,9 @@ class PortalOrderSaveView(ManagerRequiredMixin, View):
                 glass_obj = Glass.objects.get(name=portal["glazing"])
                 color_type = Color.objects.get(name=portal["color"])
 
+                portal_details = dict(calc_results[name])
+                portal_details["percentage_sale"] = percentage_sale_value
+
                 Portal.objects.create(
                     width=width,
                     height=height,
@@ -423,7 +481,7 @@ class PortalOrderSaveView(ManagerRequiredMixin, View):
                     glass=glass_obj,
                     order=order,
                     amount=amount,
-                    calculation_details=calc_results[name],
+                    calculation_details=portal_details,
                 )
 
-        return JsonResponse({"status": "success"})
+        return JsonResponse({"status": "success", "order_id": order.id})

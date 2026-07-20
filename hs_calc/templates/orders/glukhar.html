@@ -116,6 +116,10 @@
         // Глобальные переменные для динамического пересчета
         let baseTotalPrice = 0;
         let totalArea = 0;
+        let lastGrandTotal = 0;
+
+        const isAdmin = {{ is_admin|yesno:"true,false" }};
+        const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
 
         // --- ФУНКЦИЯ КРАСИВЫХ АЛЕРТОВ ---
         function showAlert(message, type = 'danger') {
@@ -379,11 +383,15 @@
                     <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0" id="dynamicGrandTotal">
                         ИТОГО С УЧЕТОМ ДОП. УСЛУГ: 0.00 руб.
                     </div>
+                    ${isAdmin ? '' : `<div class="mt-2 alert alert-info text-center fw-bold mb-0" id="dealerPercentageBlock"></div>`}
                 </div>
             </div>`;
             
             html += `<div class="d-flex flex-wrap gap-2 mb-5">
                 <button type="button" class="btn btn-primary ms-auto" id="saveOrderBtn">Сохранить заказ</button>
+                <button type="button" class="btn btn-outline-dark" id="downloadKpBtn" style="display: none;">
+                    <i class="bi bi-file-earmark-word"></i> Скачать КП
+                </button>
             </div>`;
 
             resultContainer.innerHTML = html;
@@ -397,12 +405,27 @@
             enforceMinimumsAndRecalculate();
 
             document.getElementById('saveOrderBtn').onclick = () => saveOrder(document.getElementById('saveOrderBtn'));
+            document.getElementById('downloadKpBtn').onclick = () => downloadKp();
+        }
+
+        // Кнопка "Скачать КП" — пока ничего не делает, функционал будет добавлен позже.
+        function downloadKp() {
+            // TODO: реализовать генерацию и скачивание docx-файла с коммерческим предложением.
         }
 
         // 5. Логика динамического пересчета и контроля минимумов
         function enforceMinimumsAndRecalculate() {
             const finalTotal = getFinalTotal();
+            lastGrandTotal = finalTotal;
             document.getElementById('dynamicGrandTotal').textContent = `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toFixed(2)} руб.`;
+
+            if (!isAdmin) {
+                const dealerAmount = Math.round(dealerPercentage / 100 * finalTotal);
+                const dealerBlock = document.getElementById('dealerPercentageBlock');
+                if (dealerBlock) {
+                    dealerBlock.textContent = `Процент дилера (${dealerPercentage}%): ${dealerAmount.toLocaleString('ru-RU')} руб.`;
+                }
+            }
         }
 
         function getFinalTotal() {
@@ -429,6 +452,7 @@
             payload.unloading = parseFloat(document.getElementById('unloadingCost').value);
             payload.profit_ratio = parseFloat(document.getElementById('profitRatio').textContent);
             payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
+            payload.order_total = lastGrandTotal;
             
             if (payload.buyer_id === 'new') {
                 payload.buyer_data = {
@@ -461,6 +485,8 @@
                     showAlert(`Заказ успешно сохранен!`, 'success');
                     btnElement.innerHTML = 'Заказ сохранен';
                     btnElement.classList.replace('btn-primary', 'btn-secondary');
+                    const kpBtn = document.getElementById('downloadKpBtn');
+                    if (kpBtn) kpBtn.style.display = 'inline-block';
                 } else {
                     showAlert('Ошибка сохранения: ' + data.error);
                     btnElement.disabled = false;

@@ -39,6 +39,11 @@ class Scheme(Model):
     sash_sub = PositiveIntegerField(
         verbose_name="Створочный подстав",
     )
+    ratio = DecimalField(
+        verbose_name="Коэффициент прибыли",
+        max_digits=5,
+        decimal_places=2,
+    )
 
     def __str__(self):
         return self.name

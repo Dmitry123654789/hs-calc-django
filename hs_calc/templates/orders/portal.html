@@ -135,6 +135,9 @@
     document.addEventListener('DOMContentLoaded', function() {
         const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
         const profitRatioFromContext = parseFloat('{{ profit_ratio }}') || 1.0;
+        const isAdmin = {{ is_admin|yesno:"true,false" }};
+        const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
+        let lastGrandTotal = 0;
         
         const container = document.getElementById('portalContainer');
         const template = document.getElementById('portalCardTemplate');
@@ -417,11 +420,15 @@
                     <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0 border-dark shadow-sm text-uppercase" id="dynamicGrandTotal">
                         Итого с учетом доп. услуг: 0.00 руб.
                     </div>
+                    ${isAdmin ? '' : `<div class="mt-2 alert alert-info text-center fw-bold mb-0" id="dealerPercentageBlock"></div>`}
                 </div>
             </div>`;
             
             html += `<div class="d-flex flex-wrap gap-2 mb-5">
                 <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">Сохранить заказ</button>
+                <button type="button" class="btn btn-outline-dark btn-lg" id="downloadKpBtn" style="display: none;">
+                    <i class="bi bi-file-earmark-word"></i> Скачать КП
+                </button>
             </div>`;
 
             resultContainer.innerHTML = html;
@@ -432,6 +439,15 @@
             document.getElementById('saveOrderBtn').onclick = function() {
                 saveOrder(this);
             };
+
+            document.getElementById('downloadKpBtn').onclick = function() {
+                downloadKp();
+            };
+        }
+
+        // Кнопка "Скачать КП" — пока ничего не делает, функционал будет добавлен позже.
+        function downloadKp() {
+            // TODO: реализовать генерацию и скачивание docx-файла с коммерческим предложением.
         }
 
         function recalculateGrandTotal() {
@@ -442,7 +458,16 @@
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
             const finalTotal = (baseTotalPrice * ratio) + (totalArea * installRate) + delivery + unloading - discount;
+            lastGrandTotal = finalTotal;
             document.getElementById('dynamicGrandTotal').textContent = `Итого с учетом доп. услуг: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
+
+            if (!isAdmin) {
+                const dealerAmount = Math.round(dealerPercentage / 100 * finalTotal);
+                const dealerBlock = document.getElementById('dealerPercentageBlock');
+                if (dealerBlock) {
+                    dealerBlock.textContent = `Процент дилера (${dealerPercentage}%): ${dealerAmount.toLocaleString('ru-RU')} руб.`;
+                }
+            }
         }
 
         async function saveOrder(btnElement) {
@@ -453,6 +478,7 @@
             payload.delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
             payload.unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
             payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
+            payload.order_total = lastGrandTotal;
             
             if (payload.buyer_id === 'new') {
                 payload.buyer_data = {
@@ -483,9 +509,11 @@
                 });
                 const data = await response.json();
                 if (data.status === 'success') {
-                    showAlert(`Заказ успешно сохранен в базу данных!`, 'success');
+                    showAlert(`Заказ успешно сохранен!`, 'success');
                     btnElement.innerHTML = 'Заказ успешно сохранен';
                     btnElement.classList.replace('btn-primary', 'btn-secondary');
+                    const kpBtn = document.getElementById('downloadKpBtn');
+                    if (kpBtn) kpBtn.style.display = 'inline-block';
                 } else {
                     showAlert('Ошибка при сохранении: ' + data.error);
                     btnElement.disabled = false;

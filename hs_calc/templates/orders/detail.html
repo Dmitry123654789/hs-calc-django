@@ -218,6 +218,9 @@
                 <button class="btn btn-success btn-sm" type="button" onclick="triggerExcelExport()">
                     <i class="bi bi-file-earmark-excel"></i> Сохранить в Excel
                 </button>
+                <button class="btn btn-sm btn-success" type="button" id="downloadKpBtn" onclick="downloadKp()" style="border-left: 2px solid black">
+                    <i class="bi bi-file-earmark-word"></i> Скачать КП
+                </button>
             </div>
         </div>
         <div class="card-body p-0">
@@ -313,6 +316,11 @@
             if (malyarCell) malyarCell.textContent = totalMalyar.toFixed(2);
         });
     });
+
+    // Кнопка "Скачать КП" — пока ничего не делает, функционал будет добавлен позже.
+    function downloadKp() {
+        // TODO: реализовать генерацию и скачивание docx-файла с коммерческим предложением.
+    }
 
     // Функция-обертка для чтения значения селекта и запуска выгрузки
     function triggerExcelExport() {

@@ -104,6 +104,9 @@
                 <button type="button" class="btn btn-outline-warning" id="skipBtn" style="display: none;">Пропустить</button>
                 <button type="button" class="btn btn-success btn-lg" id="nextBtn">Далее →</button>
                 <button type="button" class="btn btn-primary btn-lg" id="saveOrderBtn" style="display: none;">Сохранить заказ в базу</button>
+                <button type="button" class="btn btn-outline-dark btn-lg" id="downloadKpBtn" style="display: none;">
+                    <i class="bi bi-file-earmark-word"></i> Скачать КП
+                </button>
             </div>
         </div>
     </form>
@@ -252,6 +255,9 @@ document.addEventListener('DOMContentLoaded', function () {
     const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
     const portalProfitRatio = parseFloat('{{ portal_profit_ratio }}') || 1.0;
     const glukharProfitRatio = parseFloat('{{ glukhar_profit_ratio }}') || 1.0;
+    const isAdmin = {{ is_admin|yesno:"true,false" }};
+    const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
+    let lastGrandTotal = 0;
 
     const form = document.getElementById('orderForm');
     const buyerSelect = document.getElementById('buyerSelect');
@@ -271,6 +277,7 @@ document.addEventListener('DOMContentLoaded', function () {
     const skipBtn = document.getElementById('skipBtn');
     const nextBtn = document.getElementById('nextBtn');
     const saveOrderBtn = document.getElementById('saveOrderBtn');
+    const downloadKpBtn = document.getElementById('downloadKpBtn');
 
     const TOTAL_STEPS = 4;
     let currentStep = 1;
@@ -387,6 +394,15 @@ document.addEventListener('DOMContentLoaded', function () {
         saveOrder(this);
     });
 
+    // Кнопка "Скачать КП" — пока ничего не делает, функционал будет добавлен позже.
+    downloadKpBtn.addEventListener('click', function () {
+        downloadKp();
+    });
+
+    function downloadKp() {
+        // TODO: реализовать генерацию и скачивание docx-файла с коммерческим предложением.
+    }
+
     // ---------- Шаг "Глухари": карточки ----------
     function addGlukharCard() {
         glukharIdCounter++;
@@ -480,6 +496,7 @@ document.addEventListener('DOMContentLoaded', function () {
         saveOrderBtn.innerHTML = 'Сохранить заказ в базу';
         saveOrderBtn.classList.remove('btn-secondary');
         saveOrderBtn.classList.add('btn-primary');
+        downloadKpBtn.style.display = 'none';
 
         portalCalcResult = null;
         glukharCalcResult = null;
@@ -592,10 +609,12 @@ document.addEventListener('DOMContentLoaded', function () {
                     </div>
                 </div>
                 <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0" id="dynamicGrandTotal"></div>
+                ${isAdmin ? '' : `<div class="mt-2 alert alert-info text-center fw-bold mb-0" id="dealerPercentageBlock"></div>`}
             </div>
         </div>`;
 
         resultsContainer.innerHTML = html;
+        lastGrandTotal = 0;
 
         function recalcGrandTotal() {
             const installRate = parseFloat(document.getElementById('installRate').value) || 0;
@@ -608,8 +627,18 @@ document.addEventListener('DOMContentLoaded', function () {
                 + (glukharTotalRaw * glukharProfitRatio)
                 + (totalArea * installRate) + delivery + unloading - discount;
 
+            lastGrandTotal = finalTotal;
+
             document.getElementById('dynamicGrandTotal').textContent =
                 `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
+
+            if (!isAdmin) {
+                const dealerAmount = Math.round(dealerPercentage / 100 * finalTotal);
+                const dealerBlock = document.getElementById('dealerPercentageBlock');
+                if (dealerBlock) {
+                    dealerBlock.textContent = `Процент дилера (${dealerPercentage}%): ${dealerAmount.toLocaleString('ru-RU')} руб.`;
+                }
+            }
         }
 
         document.querySelectorAll('.cost-input').forEach(inp => inp.addEventListener('input', recalcGrandTotal));
@@ -623,6 +652,7 @@ document.addEventListener('DOMContentLoaded', function () {
             delivery: parseFloat(document.getElementById('deliveryCost').value) || 0,
             unloading: parseFloat(document.getElementById('unloadingCost').value) || 0,
             discount: parseInt(document.getElementById('discountRate').value) || 0,
+            order_total: lastGrandTotal,
             portals: portalsPayload,
             glukhars: glukharsPayload,
         };
@@ -658,6 +688,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 showAlert('Заказ успешно сохранен!', 'success');
                 btnElement.innerHTML = 'Заказ сохранен';
                 btnElement.classList.replace('btn-primary', 'btn-secondary');
+                downloadKpBtn.style.display = 'inline-block';
             } else {
                 showAlert('Ошибка сохранения: ' + data.error);
                 btnElement.disabled = false;
