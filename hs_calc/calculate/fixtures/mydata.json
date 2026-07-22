@@ -10,7 +10,8 @@
     "fixed_sash": 1,
     "rail_amour": 1,
     "door_sub": 149,
-    "sash_sub": 60
+    "sash_sub": 60,
+    "ratio": 1
   }
 },
 {
@@ -24,7 +25,8 @@
     "fixed_sash": 2,
     "rail_amour": 1,
     "door_sub": 131,
-    "sash_sub": 42
+    "sash_sub": 42,
+    "ratio": 1
   }
 },
 {
@@ -38,7 +40,8 @@
     "fixed_sash": 2,
     "rail_amour": 1,
     "door_sub": 195,
-    "sash_sub": 57
+    "sash_sub": 57,
+    "ratio": 1
   }
 },
 {
@@ -52,7 +55,8 @@
     "fixed_sash": 1,
     "rail_amour": 2,
     "door_sub": 122,
-    "sash_sub": 33
+    "sash_sub": 33,
+    "ratio": 1
   }
 },
 {
@@ -66,7 +70,8 @@
     "fixed_sash": 2,
     "rail_amour": 2,
     "door_sub": 110,
-    "sash_sub": 25
+    "sash_sub": 25,
+    "ratio": 1
   }
 },
 {

@@ -134,7 +134,6 @@
 <script>
     document.addEventListener('DOMContentLoaded', function() {
         const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
-        const profitRatioFromContext = parseFloat('{{ profit_ratio }}') || 1.0;
         const isAdmin = {{ is_admin|yesno:"true,false" }};
         const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
         let lastGrandTotal = 0;
@@ -410,7 +409,7 @@
                         </div>
                         <div class="col-lg col-md-6">
                             <label class="form-label fw-bold small">Наценка</label>
-                            <div class="form-control bg-white fw-bold" id="profitRatio">${profitRatioFromContext}</div>
+                            <div class="form-control bg-white fw-bold" id="profitRatio">{{ profit_ratio }}</div>
                         </div>
                         <div class="col-lg col-md-6">
                             <label class="form-label fw-bold text-danger small">Скидка (руб)</label>

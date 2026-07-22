@@ -1,4 +1,3 @@
-from decimal import Decimal, ROUND_HALF_UP
 from json import dumps, loads
 
 from django.db import transaction
@@ -23,21 +22,11 @@ from orders.models import Order
 from users.models import Buyer
 
 
-def calculate_dealer_percentage_amount(user, order_total):
-    """
-    Считает сумму (в целых рублях), причитающуюся дилеру, как
-    profile.percentage_sale / 100 * order_total.
+def calculate_dealer_percentage(user):
+    if user.profile.is_manager:
+        return user.profile.percentage_sale
 
-    Если оформляет админ — сумма всегда 0.
-    """
-    profile = getattr(user, "profile", None)
-    if profile is None or profile.is_director:
-        return 0
-
-    percentage = Decimal(profile.percentage_sale or 0)
-    total = Decimal(str(order_total or 0))
-    amount = (percentage / Decimal("100")) * total
-    return int(amount.quantize(Decimal("1"), rounding=ROUND_HALF_UP))
+    return 0
 
 
 def serialize_product(instance):
@@ -115,8 +104,8 @@ class OrderEditView(AdminRequiredMixin, DetailView):
                     "id": portal.id,
                     "type": "portal",
                     "type_label": "Портал",
-                    "title":
-                        f"Портал {portal.width}×{portal.height}, {portal.amount} шт.",
+                    "title": f"Портал {portal.width}×{portal.height}, "
+                    f"{portal.amount} шт.",
                     "is_finished": portal.is_finished,
                 },
             )
@@ -130,8 +119,8 @@ class OrderEditView(AdminRequiredMixin, DetailView):
                     "id": glukhar.id,
                     "type": "glukhar",
                     "type_label": "Глухарь",
-                    "title":
-                        f"Глухарь {glukhar.width}×{glukhar.height}, {glukhar.amount} шт.",
+                    "title": f"Глухарь {glukhar.width}×{glukhar.height}, "
+                    f"{glukhar.amount} шт.",
                     "is_finished": glukhar.is_finished,
                 },
             )
@@ -183,7 +172,9 @@ class OrderFormView(ManagerRequiredMixin, View):
         schemes = list(Scheme.objects.values("id", "name", "min_size", "max_size"))
 
         is_admin = request.user.profile.is_director
-        dealer_percentage = 0 if is_admin else float(request.user.profile.percentage_sale or 0)
+        dealer_percentage = (
+            0 if is_admin else float(request.user.profile.percentage_sale or 0)
+        )
 
         context = {
             "portal_profit_ratio": portal_ratio,
@@ -222,7 +213,7 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
         discount = int(config.get("discount", 0))
 
         order_total = config.get("order_total", 0)
-        percentage_sale_value = calculate_dealer_percentage_amount(request.user, order_total)
+        percentage_worker = calculate_dealer_percentage(request.user)
 
         buyer = None
         if buyer_id not in (None, "null", "new"):
@@ -240,6 +231,8 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
                 discount=discount,
                 creator=request.user,
                 buyer=buyer,
+                percentage_worker=percentage_worker,
+                total_sum=order_total,
             )
 
             for portal in portals:
@@ -250,7 +243,6 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
                 color_type = Color.objects.get(name=portal["color"])
 
                 portal_details = dict(portal_calc_results[portal["name"]])
-                portal_details["percentage_sale"] = percentage_sale_value
 
                 Portal.objects.create(
                     width=portal["width"],
@@ -272,7 +264,6 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
                 color_type = Color.objects.get(name=glukhar["color"])
 
                 glukhar_details = dict(glukhar_calc_results[glukhar["name"]])
-                glukhar_details["percentage_sale"] = percentage_sale_value
 
                 Glukhar.objects.create(
                     width=int(glukhar["width"]),
@@ -294,7 +285,9 @@ class GlukharOrderView(ManagerRequiredMixin, View):
         profit_ratio = float(ratio_obj.ratio)
 
         is_admin = request.user.profile.is_director
-        dealer_percentage = 0 if is_admin else float(request.user.profile.percentage_sale or 0)
+        dealer_percentage = (
+            0 if is_admin else float(request.user.profile.percentage_sale or 0)
+        )
 
         context = {
             "profit_ratio": profit_ratio,
@@ -313,7 +306,9 @@ class GlukharOrderView(ManagerRequiredMixin, View):
         calc_result["profit_ratio"] = float(ratio_obj.ratio)
 
         if not request.user.profile.is_director:
-            calc_result["dealer_percentage"] = float(request.user.profile.percentage_sale or 0)
+            calc_result["dealer_percentage"] = float(
+                request.user.profile.percentage_sale or 0,
+            )
 
         return JsonResponse(calc_result)
 
@@ -333,7 +328,7 @@ class SaveGlukharOrderView(ManagerRequiredMixin, View):
         discount = int(config.get("discount", 0))
 
         order_total = config.get("order_total", 0)
-        percentage_sale_value = calculate_dealer_percentage_amount(request.user, order_total)
+        percentage_worker = calculate_dealer_percentage(request.user)
 
         buyer = None
         if buyer_id not in ["null", "new"]:
@@ -351,9 +346,10 @@ class SaveGlukharOrderView(ManagerRequiredMixin, View):
                 discount=discount,
                 creator=request.user,
                 buyer=buyer,
+                percentage_worker=percentage_worker,
+                total_sum=order_total,
             )
 
-        with transaction.atomic():
             for glukhar in config["glukhars"]:
                 width = glukhar["width"]
                 height = glukhar["height"]
@@ -366,7 +362,6 @@ class SaveGlukharOrderView(ManagerRequiredMixin, View):
                 key = glukhar["name"]
 
                 glukhar_details = dict(calc_results[key])
-                glukhar_details["percentage_sale"] = percentage_sale_value
 
                 Glukhar.objects.create(
                     width=int(width),
@@ -390,7 +385,9 @@ class PortalOrderView(ManagerRequiredMixin, View):
         schemes = list(Scheme.objects.values("id", "name", "min_size", "max_size"))
 
         is_admin = request.user.profile.is_director
-        dealer_percentage = 0 if is_admin else float(request.user.profile.percentage_sale or 0)
+        dealer_percentage = (
+            0 if is_admin else float(request.user.profile.percentage_sale or 0)
+        )
 
         context = {
             "profit_ratio": profit_ratio,
@@ -410,7 +407,9 @@ class PortalOrderView(ManagerRequiredMixin, View):
         calc_result["profit_ratio"] = float(ratio_obj.ratio)
 
         if not request.user.profile.is_director:
-            calc_result["dealer_percentage"] = float(request.user.profile.percentage_sale or 0)
+            calc_result["dealer_percentage"] = float(
+                request.user.profile.percentage_sale or 0,
+            )
 
         return JsonResponse(calc_result)
 
@@ -430,7 +429,7 @@ class PortalOrderSaveView(ManagerRequiredMixin, View):
         discount = int(config.get("discount", 0))
 
         order_total = config.get("order_total", 0)
-        percentage_sale_value = calculate_dealer_percentage_amount(request.user, order_total)
+        percentage_worker = calculate_dealer_percentage(request.user)
 
         buyer = None
         if buyer_id not in ["null", "new"]:
@@ -448,6 +447,8 @@ class PortalOrderSaveView(ManagerRequiredMixin, View):
                 discount=discount,
                 creator=request.user,
                 buyer=buyer,
+                percentage_worker=percentage_worker,
+                total_sum=order_total,
             )
 
         with transaction.atomic():
@@ -467,7 +468,6 @@ class PortalOrderSaveView(ManagerRequiredMixin, View):
                 color_type = Color.objects.get(name=portal["color"])
 
                 portal_details = dict(calc_results[name])
-                portal_details["percentage_sale"] = percentage_sale_value
 
                 Portal.objects.create(
                     width=width,

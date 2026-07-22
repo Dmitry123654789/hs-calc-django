@@ -50,3 +50,15 @@ class Order(Model):
         verbose_name="Дата создания",
         auto_now_add=True,
     )
+    percentage_worker = DecimalField(
+        verbose_name="процент работника",
+        max_digits=10,
+        decimal_places=2,
+        default=0,
+    )
+    total_sum = DecimalField(
+        verbose_name="стоимость всего заказа",
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+    )
