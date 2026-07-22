@@ -231,6 +231,10 @@
                         <th>Доставка</th>
                         <th>Установка (Монтаж)</th>
                         <th>Разгрузка</th>
+                        <th>Итого по заказу</th>
+                        <th>Процент дилера</th>
+                        <th>Сумма дилера</th>
+                        <th>Создал</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -239,6 +243,10 @@
                         <td>{{ order.delivery }} руб.</td>
                         <td>{{ order.installation }} руб.</td>
                         <td>{{ order.unloading }} руб.</td>
+                        <td class="fw-bold table-success">{{ order.total_sum }} руб.</td>
+                        <td>{{ order.percentage_worker }}%</td>
+                        <td class="fw-bold">{{ dealer_amount }} руб.</td>
+                        <td>{{ order.creator.get_full_name|default:order.creator.username }}</td>
                     </tr>
                 </tbody>
             </table>

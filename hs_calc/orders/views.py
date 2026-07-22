@@ -1,3 +1,4 @@
+from decimal import Decimal, ROUND_HALF_UP
 from json import dumps, loads
 
 from django.db import transaction
@@ -70,6 +71,14 @@ class OrderDetailView(DetailView, AdminRequiredMixin):
         context = super().get_context_data(**kwargs)
         context["portals"] = self.object.portal_set.all()
         context["glukhars"] = self.object.glukhar_set.all()
+
+        dealer_percentage = self.object.percentage_worker or Decimal("0")
+        total_sum = self.object.total_sum or Decimal("0")
+        dealer_amount = (dealer_percentage / Decimal("100")) * total_sum
+        context["dealer_amount"] = dealer_amount.quantize(
+            Decimal("1"), rounding=ROUND_HALF_UP,
+        )
+
         return context
 
 

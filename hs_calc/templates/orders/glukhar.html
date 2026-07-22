@@ -120,6 +120,7 @@
 
         const isAdmin = {{ is_admin|yesno:"true,false" }};
         const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
+        const profitRatioFromContext = parseFloat('{{ profit_ratio|default:1.0 }}') || 1.0;
 
         // --- ФУНКЦИЯ КРАСИВЫХ АЛЕРТОВ ---
         function showAlert(message, type = 'danger') {
@@ -371,19 +372,15 @@
                             <label class="form-label fw-bold">Разгрузка (руб)</label>
                             <input type="number" class="form-control cost-input" id="unloadingCost" min=0 value="50000">
                         </div>
-                        <div class="col-lg col-md-6">
-                            <label class="form-label fw-bold">Наценка</label>
-                            <a class="form-control bg-light" id="profitRatio" style="text-decoration: none;">{{ profit_ratio|default:1.0 }}</a>
-                        </div>
-                        <div class="col-lg col-md-6">
+                        <div class="col-lg col-md-4">
                             <label class="form-label fw-bold text-danger">Скидка (руб)</label>
                             <input type="number" class="form-control cost-input" id="discountRate" min=0 max=100 value="0">
                         </div>
                     </div>
-                    <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0" id="dynamicGrandTotal">
-                        ИТОГО С УЧЕТОМ ДОП. УСЛУГ: 0.00 руб.
+                    <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0 d-flex flex-wrap justify-content-center align-items-center gap-3">
+                        <span id="dynamicGrandTotal">ИТОГО С УЧЕТОМ ДОП. УСЛУГ: 0.00 руб.</span>
+                        ${isAdmin ? '' : `<span id="dealerPercentageBlock" class="border-start ps-3"></span>`}
                     </div>
-                    ${isAdmin ? '' : `<div class="mt-2 alert alert-info text-center fw-bold mb-0" id="dealerPercentageBlock"></div>`}
                 </div>
             </div>`;
             
@@ -432,7 +429,7 @@
             const installRate = parseFloat(document.getElementById('installRate').value) || 0;
             const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
             const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
-            const ratio = parseFloat(document.getElementById('profitRatio').textContent) || 1.0;
+            const ratio = profitRatioFromContext;
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
             const subTotal = (baseTotalPrice * ratio) + (totalArea * installRate) + delivery + unloading;
@@ -450,7 +447,7 @@
             payload.installation = parseFloat(document.getElementById('installRate').value);
             payload.delivery = parseFloat(document.getElementById('deliveryCost').value);
             payload.unloading = parseFloat(document.getElementById('unloadingCost').value);
-            payload.profit_ratio = parseFloat(document.getElementById('profitRatio').textContent);
+            payload.profit_ratio = profitRatioFromContext;
             payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
             payload.order_total = lastGrandTotal;
             
