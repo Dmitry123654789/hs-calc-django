@@ -7,7 +7,6 @@ class UniversalErrorMiddleware:
 
     def __call__(self, request):
         response = self.get_response(request)
-        print(response.status_code)
         ignored_codes = [403, 404]
 
         if response.status_code >= 400 and response.status_code not in ignored_codes:

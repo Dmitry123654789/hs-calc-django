@@ -1,0 +1,102 @@
+{% extends "base.html" %}
+
+{% block title %}Наценка{% endblock %}
+
+{% block content %}
+<h1 class="h3 mb-4">Наценка на товары</h1>
+
+<div class="row g-4">
+  <div class="col-lg-6">
+    <h2 class="h5">Схемы (коэффициент прибыли)</h2>
+    <table class="table table-bordered align-middle">
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th style="width: 200px;">Коэффициент</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for scheme in schemes %}
+        <tr>
+          <td>{{ scheme.name }}</td>
+          <td>
+            <div class="input-group input-group-sm">
+              <input type="number" step="0.01" class="form-control ratio-input"
+                     data-type="scheme" data-id="{{ scheme.id }}" value="{{ scheme.ratio }}">
+              <button class="btn btn-outline-primary save-btn" type="button">Сохранить</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col-lg-6">
+    <h2 class="h5">Общие коэффициенты прибыли</h2>
+    <table class="table table-bordered align-middle">
+      <thead>
+        <tr>
+          <th>Название</th>
+          <th style="width: 200px;">Коэффициент</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ratio_obj in profit_ratios %}
+        <tr>
+        {% if ratio_obj.name == "glukhar" %}
+            <td>Глухари</td>
+        {% else %}
+            <td>{{ ratio_obj.name }}</td>
+        {% endif %}
+          
+          <td>
+            <div class="input-group input-group-sm">
+              <input type="number" step="0.01" class="form-control ratio-input"
+                     data-type="profit_ratio" data-id="{{ ratio_obj.id }}" value="{{ ratio_obj.ratio }}">
+              <button class="btn btn-outline-primary save-btn" type="button">Сохранить</button>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.querySelectorAll(".save-btn").forEach((btn) => {
+  btn.addEventListener("click", () => {
+    const input = btn.closest(".input-group").querySelector(".ratio-input");
+    fetch("{% url 'calculate:markup' %}", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "X-CSRFToken": "{{ csrf_token }}",
+      },
+      body: JSON.stringify({
+        type: input.dataset.type,
+        id: input.dataset.id,
+        ratio: input.value,
+      }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        if (data.status === "success") {
+          btn.textContent = "Сохранено";
+          btn.classList.replace("btn-outline-primary", "btn-success");
+          setTimeout(() => {
+            btn.textContent = "Сохранить";
+            btn.classList.replace("btn-success", "btn-outline-primary");
+          }, 1200);
+        } else {
+          alert(data.message || "Ошибка сохранения");
+        }
+      })
+      .catch(() => alert("Ошибка сохранения"));
+  });
+});
+</script>
+{% endblock %}

@@ -4,6 +4,7 @@ from django.contrib.admin import site
 from django.urls import include, path
 
 import about.urls
+import calculate.urls
 from hs_calc.views import NotPermissionView
 import orders.urls
 import users.urls
@@ -12,6 +13,7 @@ import users.urls
 urlpatterns = [
     path("admin/", site.urls),
     path("auth/", include(users.urls)),
+    path("calculate/", include(calculate.urls)),
     path("order/", include(orders.urls)),
     path("", include(about.urls)),
 
