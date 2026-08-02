@@ -253,7 +253,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
-    const portalProfitRatio = parseFloat('{{ portal_profit_ratio }}') || 1.0;
     const glukharProfitRatio = parseFloat('{{ glukhar_profit_ratio }}') || 1.0;
     const isAdmin = {{ is_admin|yesno:"true,false" }};
     const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
@@ -533,7 +532,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderResults() {
-        const portalTotalRaw = portalCalcResult ? (portalCalcResult['ИТОГО'] || 0) : 0;
+        const portalTotalWithRatio = portalCalcResult ? (portalCalcResult['ИТОГО_С_КОЭФФИЦИЕНТОМ'] || 0) : 0;
         const glukharTotalRaw = glukharCalcResult ? (glukharCalcResult['ИТОГО'] || 0) : 0;
 
         let html = '<h3 class="mb-3 border-bottom pb-2">📊 Результаты расчета</h3>';
@@ -541,7 +540,9 @@ document.addEventListener('DOMContentLoaded', function () {
         if (portalsPayload.length) {
             html += '<h5 class="mt-3">Порталы</h5><div class="row g-3 mb-3">';
             portalsPayload.forEach((p, index) => {
-                const total = (portalCalcResult[p.name] || {}).portal_total || 0;
+                const portalResult = portalCalcResult[p.name] || {};
+                const total = portalResult.portal_total_with_ratio || 0;
+                const schemeRatio = portalResult.scheme_ratio || 1;
                 html += `<div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm border-secondary">
                         <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between">
@@ -625,7 +626,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
             const totalArea = portalArea + glukharArea;
-            const finalTotal = (portalTotalRaw * portalProfitRatio)
+            const finalTotal = portalTotalWithRatio
                 + (glukharTotalRaw * glukharProfitRatio)
                 + (totalArea * installRate) + delivery + unloading - discount;
 

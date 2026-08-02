@@ -175,10 +175,11 @@ class OrderEditView(AdminRequiredMixin, DetailView):
 
 class OrderFormView(ManagerRequiredMixin, View):
     def get(self, request):
-        portal_ratio = float(ProfitRatio.objects.get(name="portal").ratio)
         glukhar_ratio = float(ProfitRatio.objects.get(name="glukhar").ratio)
 
-        schemes = list(Scheme.objects.values("id", "name", "min_size", "max_size"))
+        schemes = list(
+            Scheme.objects.values("id", "name", "min_size", "max_size", "ratio"),
+        )
 
         is_admin = request.user.profile.is_director
         dealer_percentage = (
@@ -186,9 +187,8 @@ class OrderFormView(ManagerRequiredMixin, View):
         )
 
         context = {
-            "portal_profit_ratio": portal_ratio,
             "glukhar_profit_ratio": glukhar_ratio,
-            "schemes_json": dumps(schemes),
+            "schemes_json": dumps(schemes, default=str),
             "is_admin": is_admin,
             "dealer_percentage": dealer_percentage,
         }
@@ -388,10 +388,9 @@ class SaveGlukharOrderView(ManagerRequiredMixin, View):
 
 class PortalOrderView(ManagerRequiredMixin, View):
     def get(self, request):
-        ratio_obj = ProfitRatio.objects.get(name="portal")
-        profit_ratio = float(ratio_obj.ratio)
-
-        schemes = list(Scheme.objects.values("id", "name", "min_size", "max_size"))
+        schemes = list(
+            Scheme.objects.values("id", "name", "min_size", "max_size", "ratio"),
+        )
 
         is_admin = request.user.profile.is_director
         dealer_percentage = (
@@ -399,8 +398,7 @@ class PortalOrderView(ManagerRequiredMixin, View):
         )
 
         context = {
-            "profit_ratio": profit_ratio,
-            "schemes_json": dumps(schemes),
+            "schemes_json": dumps(schemes, default=str),
             "is_admin": is_admin,
             "dealer_percentage": dealer_percentage,
         }
@@ -411,9 +409,6 @@ class PortalOrderView(ManagerRequiredMixin, View):
 
         portals = data.get("portals", [])
         calc_result = calculate_portals(portals)
-
-        ratio_obj = ProfitRatio.objects.get(name="portal")
-        calc_result["profit_ratio"] = float(ratio_obj.ratio)
 
         if not request.user.profile.is_director:
             calc_result["dealer_percentage"] = float(

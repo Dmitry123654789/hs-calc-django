@@ -211,6 +211,8 @@ def get_price_4k(has_rain, portal_width, scheme_name, do_round=True):
     result = portal_width / stvorki
     if int(result) < 3000 and do_round:
         result = ceil(result / 100) * 100
+    else:
+        result = round(result)
 
     return {"w_list": result, "price": (result * fixed_sash * get_price("4К")) / 1000}
 
@@ -396,20 +398,27 @@ def calculate_glass(scheme_name, glass_type, portal_width, portal_height):
     sashes_amount = get_fixed_sash_amount(scheme_name)
     stvorki = doors_amount + sashes_amount
 
-    glass_door_w = (portal_width / stvorki) - glass_door_w_sub
+    glass_door_w = round((portal_width / stvorki) - glass_door_w_sub)
     glass_door_h = portal_height - GLASS_HEIGHT_DOOR_SUB
-    sash_door_w = (portal_width / stvorki) - glass_sash_w_sub
+    sash_door_w = round((portal_width / stvorki) - glass_sash_w_sub)
     sash_door_h = portal_height - GLASS_HEIGHT_SASH_SUB
     glass_price = get_glass_price(glass_type)
 
+    doors_price = round(
+        glass_door_w * glass_door_h * doors_amount * glass_price / 1_000_000, 2,
+    )
+    sashes_price = round(
+        sash_door_w * sash_door_h * sashes_amount * glass_price / 1_000_000, 2,
+    )
+
     return {
         "doors": {
-            "price": glass_door_w * glass_door_h * doors_amount * glass_price / 1_000_000,
+            "price": doors_price,
             "w_list": {glass_door_w: "-"},
             "h_list": {glass_door_h: doors_amount},
         },
         "sashes": {
-            "price": sash_door_w * sash_door_h * sashes_amount * glass_price / 1_000_000,
+            "price": sashes_price,
             "w_list": {sash_door_w: "-"},
             "h_list": {sash_door_h: sashes_amount},
         },
@@ -611,32 +620,50 @@ def calculate_beams(
         "w_list": {"-": "-"},
     }
 
-    portal_total = (
+    portal_total = round(
         sum(
             v["price"] if isinstance(v, dict) and "price" in v else 0
             for v in workpiece[scheme].values()
         )
-        * amount
+        * amount,
+        2,
     )
-    return workpiece, work_data, portal_total
+
+    # Наценка берется индивидуально по схеме открывания (Scheme.ratio),
+    # а не по общему для всех порталов коэффициенту.
+    scheme_ratio = float(Scheme.objects.get(name=scheme).ratio)
+    portal_total_with_ratio = round(portal_total * scheme_ratio, 2)
+
+    return workpiece, work_data, portal_total, scheme_ratio, portal_total_with_ratio
 
 
 def calculate_portals(portals: list) -> dict:
     result = {}
     total_price = 0
+    total_price_with_ratio = 0
 
     for portal in portals:
-        workpiece, work_data, portal_total = calculate_beams(**portal)
+        (
+            workpiece,
+            work_data,
+            portal_total,
+            scheme_ratio,
+            portal_total_with_ratio,
+        ) = calculate_beams(**portal)
         result[portal["name"]] = {
             "workpiece": workpiece,
             "work_data": work_data,
             "portal_total": portal_total,
+            "scheme_ratio": scheme_ratio,
+            "portal_total_with_ratio": portal_total_with_ratio,
             "type": "portal",
             "N": portal["amount"],
         }
         total_price += portal_total
+        total_price_with_ratio += portal_total_with_ratio
 
-    result["ИТОГО"] = total_price
+    result["ИТОГО"] = round(total_price, 2)
+    result["ИТОГО_С_КОЭФФИЦИЕНТОМ"] = round(total_price_with_ratio, 2)
     return result
 
 
@@ -673,9 +700,10 @@ def calculate_glukhar_glass(width, height, amount, is_not_rectangle=False):
     glukar_width = width - 2 * GLUKHAR_GLASS_SUB
     glukar_height = height - 2 * GLUKHAR_GLASS_SUB
     glass_area = glukar_width * glukar_height / 1_000_000
-    price_glass = (
+    price_glass = round(
         get_price_glass_glukhar_on_area(glass_area if not is_not_rectangle else 10)
-        * glass_area
+        * glass_area,
+        2,
     )
     if glass_area * WEIGHT_GLASS_CONST >= 160:
         unloading = 14_000
@@ -686,7 +714,7 @@ def calculate_glukhar_glass(width, height, amount, is_not_rectangle=False):
         "length": {"w": glukar_width, "h": glukar_height},
         "amount": 1,
         "N_amount": amount,
-        "N_price": price_glass * amount,
+        "N_price": round(price_glass * amount, 2),
     }
 
 

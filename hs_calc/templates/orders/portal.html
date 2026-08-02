@@ -136,7 +136,6 @@
         const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
         const isAdmin = {{ is_admin|yesno:"true,false" }};
         const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
-        const profitRatioFromContext = parseFloat('{{ profit_ratio }}') || 1.0;
         let lastGrandTotal = 0;
         
         const container = document.getElementById('portalContainer');
@@ -358,14 +357,15 @@
 
         function displayResults(data) {
             let html = '<h3 class="mb-3 border-bottom pb-2 mt-5">📊 Результаты пакетного расчета</h3>';
-            baseTotalPrice = data["ИТОГО"] || 0;
+            baseTotalPrice = data["ИТОГО_С_КОЭФФИЦИЕНТОМ"] || 0;
 
             let cardsHtml = '<div class="row g-3 mb-4">';
             
             // Итерируемся по отправленному массиву, так как структура ответа - это словарь с именами
             lastPayload.portals.forEach((p, index) => {
                 const portalResult = data[p.name] || {};
-                const portalTotal = portalResult.portal_total || 0;
+                const portalTotal = portalResult.portal_total_with_ratio || 0;
+                const schemeRatio = portalResult.scheme_ratio || 1;
                 const currentArea = (p.width * p.height / 1000000) * p.amount;
 
                 cardsHtml += `
@@ -450,10 +450,11 @@
             const installRate = parseFloat(document.getElementById('installRate').value) || 0;
             const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
             const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
-            const ratio = profitRatioFromContext;
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
-            const finalTotal = (baseTotalPrice * ratio) + (totalArea * installRate) + delivery + unloading - discount;
+            // baseTotalPrice уже содержит сумму с учетом индивидуального
+            // коэффициента наценки для каждого портала (по его схеме).
+            const finalTotal = baseTotalPrice + (totalArea * installRate) + delivery + unloading - discount;
             lastGrandTotal = finalTotal;
             document.getElementById('dynamicGrandTotal').textContent = `Итого с учетом доп. услуг: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
 
