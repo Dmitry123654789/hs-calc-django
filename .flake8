@@ -1,7 +1,7 @@
 [flake8]
 inline-quotes = double
 import-order-style = google
-application-import-names = about, calculate, core, orders, users
+application-import-names = about, calculate, core, hs_calc, orders, users
 extend-ignore = FNE003
 max-expression-complexity = 8
 max-line-length = 90

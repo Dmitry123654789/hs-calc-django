@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Страница не найдена
+{% endblock title %}
+
+{% block content %}
+<div class="container d-flex flex-column justify-content-center align-items-center min-vh-100 text-center">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="display-1 fw-bold text-secondary">404</h1>
+            <h2 class="mb-4">Упс! Страница не найдена.</h2>
+            <p class="lead text-muted mb-5">
+                Возможно, эта страница была удалена, переименована или вы просто ошиблись в адресе.
+            </p>
+            <a href="{% url "about:home" %}" class="btn btn-primary btn-lg px-5">
+                <i class="bi bi-house-door me-2"></i>На домашнюю страницу
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock content %}

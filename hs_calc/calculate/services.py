@@ -211,8 +211,6 @@ def get_price_4k(has_rain, portal_width, scheme_name, do_round=True):
     result = portal_width / stvorki
     if int(result) < 3000 and do_round:
         result = ceil(result / 100) * 100
-    else:
-        result = round(result)
 
     return {"w_list": result, "price": (result * fixed_sash * get_price("4К")) / 1000}
 
@@ -405,10 +403,12 @@ def calculate_glass(scheme_name, glass_type, portal_width, portal_height):
     glass_price = get_glass_price(glass_type)
 
     doors_price = round(
-        glass_door_w * glass_door_h * doors_amount * glass_price / 1_000_000, 2,
+        glass_door_w * glass_door_h * doors_amount * glass_price / 1_000_000,
+        2,
     )
     sashes_price = round(
-        sash_door_w * sash_door_h * sashes_amount * glass_price / 1_000_000, 2,
+        sash_door_w * sash_door_h * sashes_amount * glass_price / 1_000_000,
+        2,
     )
 
     return {

@@ -38,9 +38,6 @@ class RegisterView(
     template_name = "users/register.html"
     success_url = reverse_lazy("users:register")
 
-    def test_func(self):
-        return self.request.user.profile.is_director
-
 
 class LoginView(DjangoLoginView):
     form_class = CustomAuthenticationForm

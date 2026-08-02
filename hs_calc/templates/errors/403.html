@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Доступ запрещен
+{% endblock title %}
+
+{% block content %}
+<div class="container d-flex flex-column justify-content-center align-items-center min-vh-100 text-center">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="display-1 fw-bold text-danger">403</h1>
+            <h2 class="mb-4">Вас здесь быть не должно</h2>
+            <p class="lead text-muted mb-5">
+                Извините, но у вас нет достаточных прав для просмотра этой страницы или выполнения этого действия.
+            </p>
+            <a href="{% url "about:home" %}" class="btn btn-outline-danger btn-lg px-5">
+                <i class="bi bi-house-door me-2"></i>На домашнюю страницу
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock content %}

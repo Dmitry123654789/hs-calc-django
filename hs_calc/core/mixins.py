@@ -1,10 +1,14 @@
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
+from django.shortcuts import redirect
 
 
 class AdminRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         user = self.request.user
         return user.profile.is_director
+
+    def handle_no_permission(self):
+        return redirect("403")
 
 
 class ManagerRequiredMixin(AdminRequiredMixin):

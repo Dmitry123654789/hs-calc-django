@@ -4,6 +4,7 @@ from django.contrib.admin import site
 from django.urls import include, path
 
 import about.urls
+from hs_calc.views import NotPermissionView
 import orders.urls
 import users.urls
 
@@ -13,6 +14,8 @@ urlpatterns = [
     path("auth/", include(users.urls)),
     path("order/", include(orders.urls)),
     path("", include(about.urls)),
+
+    path("403/", NotPermissionView.as_view(), name="403"),
 ]
 
 

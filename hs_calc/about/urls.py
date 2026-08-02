@@ -7,9 +7,5 @@ app_name = "about"
 
 
 urlpatterns = [
-    path(
-        "",
-        DescriptionView.as_view(),
-        name="home",
-    ),
+    path("", DescriptionView.as_view(), name="home"),
 ]

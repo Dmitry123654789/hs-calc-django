@@ -50,7 +50,7 @@ def serialize_product(instance):
     return result
 
 
-class OrderListView(ListView, AdminRequiredMixin):
+class OrderListView(AdminRequiredMixin, ListView):
     model = Order
     template_name = "orders/list.html"
     context_object_name = "orders_data"
@@ -59,7 +59,7 @@ class OrderListView(ListView, AdminRequiredMixin):
         return Order.objects.select_related("buyer").order_by("-created_at")
 
 
-class OrderDetailView(DetailView, AdminRequiredMixin):
+class OrderDetailView(AdminRequiredMixin, DetailView):
     model = Order
     template_name = "orders/detail.html"
     context_object_name = "order"
@@ -76,7 +76,8 @@ class OrderDetailView(DetailView, AdminRequiredMixin):
         total_sum = self.object.total_sum or Decimal("0")
         dealer_amount = (dealer_percentage / Decimal("100")) * total_sum
         context["dealer_amount"] = dealer_amount.quantize(
-            Decimal("1"), rounding=ROUND_HALF_UP,
+            Decimal("1"),
+            rounding=ROUND_HALF_UP,
         )
 
         return context

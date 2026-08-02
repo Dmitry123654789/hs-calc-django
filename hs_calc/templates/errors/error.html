@@ -1,0 +1,22 @@
+{% extends "base.html" %}
+
+{% block title %}
+  Ошибка {{ status_code }}
+{% endblock title %}
+
+{% block content %}
+<div class="container d-flex flex-column justify-content-center align-items-center min-vh-100 text-center">
+    <div class="row">
+        <div class="col-md-12">
+            <h1 class="display-1 fw-bold text-warning">{{ status_code }}</h1>
+            <h2 class="mb-4">Что-то пошло не так</h2>
+            <p class="lead text-muted mb-5">
+                Произошла непредвиденная ошибка. Мы уже работаем над ее устранением.
+            </p>
+            <a href="about:home" class="btn btn-primary btn-lg px-5">
+                <i class="bi bi-house-door me-2"></i>На домашнюю страницу
+            </a>
+        </div>
+    </div>
+</div>
+{% endblock content %}
