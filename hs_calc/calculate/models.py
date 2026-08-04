@@ -204,10 +204,10 @@ class BaseProduct(Model):
 
 class Portal(BaseProduct):
     class Color(TextChoices):
-        Silver = "silver ", "Серебро "
-        Бронза = "bronze ", "Бронза "
-        White = "white ", "Белый "
-        Brown = "brown ", "Коричневый "
+        Silver = "silver ", "Серебро"
+        Бронза = "bronze ", "Бронза"
+        White = "white ", "Белый"
+        Brown = "brown ", "Коричневый"
 
     glass = ForeignKey(
         Glass,

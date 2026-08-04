@@ -11,13 +11,35 @@
     <dd class="col-sm-9">{{ order.buyer|default:"—" }}</dd>
 
     <dt class="col-sm-3">Статус</dt>
-    <dd class="col-sm-9">
+    <dd class="col-sm-9 d-flex align-items-center gap-3 flex-wrap">
       <span id="order-status-badge"
-            class="badge {% if order.is_finished %}bg-success{% else %}bg-secondary{% endif %}">
-        {% if order.is_finished %}Завершен{% else %}В работе{% endif %}
+            class="badge
+                   {% if order.status == 'ordered' %}bg-secondary
+                   {% elif order.status == 'in_work' %}bg-primary
+                   {% elif order.status == 'done' %}bg-success
+                   {% else %}bg-danger{% endif %}">
+        {{ order.get_status_display }}
       </span>
+
+      <div id="status-actions" class="btn-group btn-group-sm">
+        {% for transition in available_transitions %}
+          <button type="button"
+                  class="btn btn-outline-secondary status-change-btn"
+                  data-status="{{ transition.value }}"
+                  {% if transition.value == "done" and not all_items_finished %}disabled title="Не все элементы заказа отмечены как выполненные"{% endif %}>
+            {{ transition.label }}
+          </button>
+        {% endfor %}
+      </div>
     </dd>
   </dl>
+
+  {% if not can_toggle_items %}
+    <div class="alert alert-warning">
+      Заказ ещё не утверждён — отмечать элементы как выполненные нельзя.
+      Переведите заказ в статус «В работе», чтобы открыть чекбоксы.
+    </div>
+  {% endif %}
 
   <table class="table table-hover align-middle">
     <thead>
@@ -47,7 +69,8 @@
                    class="form-check-input item-finished-checkbox"
                    data-type="{{ item.type }}"
                    data-id="{{ item.id }}"
-                   {% if item.is_finished %}checked{% endif %}>
+                   {% if item.is_finished %}checked{% endif %}
+                   {% if not can_toggle_items %}disabled{% endif %}>
           </td>
         </tr>
       {% empty %}
@@ -70,6 +93,26 @@
           <table class="table table-sm mb-0">
             <tbody id="itemDetailsBody"></tbody>
           </table>
+        </div>
+      </div>
+    </div>
+  </div>
+<!-- Модальное окно подтверждения смены статуса -->
+  <div class="modal fade" id="statusConfirmModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-content">
+        <div class="modal-header">
+          <h5 class="modal-title">Подтверждение</h5>
+          <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Закрыть"></button>
+        </div>
+        <div class="modal-body">
+          <p class="mb-0">
+            Сменить статус заказа на «<strong id="statusConfirmLabel"></strong>»?
+          </p>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn btn-outline-secondary" data-bs-dismiss="modal">Отмена</button>
+          <button type="button" class="btn btn-primary" id="statusConfirmAcceptBtn">Подтвердить</button>
         </div>
       </div>
     </div>
@@ -117,26 +160,79 @@
             body: JSON.stringify({ type, id, is_finished: isFinished }),
           });
 
-          if (!response.ok) {
-            throw new Error("Ошибка запроса");
+          const data = await response.json();
+
+          if (!response.ok || data.status === "error") {
+            throw new Error(data.message || "Ошибка запроса");
           }
 
-          const data = await response.json();
-          const badge = document.getElementById("order-status-badge");
-          if (data.order_is_finished) {
-            badge.textContent = "Завершен";
-            badge.classList.remove("bg-secondary");
-            badge.classList.add("bg-success");
-          } else {
-            badge.textContent = "В работе";
-            badge.classList.remove("bg-success");
-            badge.classList.add("bg-secondary");
+          const doneBtn = document.querySelector('.status-change-btn[data-status="done"]');
+          if (doneBtn) {
+            doneBtn.disabled = !data.all_items_finished;
+            doneBtn.title = data.all_items_finished
+              ? ""
+              : "Не все элементы заказа отмечены как выполненные";
           }
         } catch (error) {
           checkbox.checked = !isFinished;
-          alert("Не удалось сохранить изменение. Попробуйте еще раз.");
+          alert(error.message || "Не удалось сохранить изменение. Попробуйте еще раз.");
         }
       });
+    });
+
+    // Подтверждение смены статуса через модальное окно вместо confirm()
+    const statusConfirmModalEl = document.getElementById("statusConfirmModal");
+    const statusConfirmModal = new bootstrap.Modal(statusConfirmModalEl);
+    const statusConfirmLabel = document.getElementById("statusConfirmLabel");
+    const statusConfirmAcceptBtn = document.getElementById("statusConfirmAcceptBtn");
+
+    let pendingStatus = null;
+
+    document.querySelectorAll(".status-change-btn").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.disabled) return;
+
+        pendingStatus = btn.dataset.status;
+        statusConfirmLabel.textContent = btn.textContent.trim();
+        statusConfirmModal.show();
+      });
+    });
+
+    statusConfirmAcceptBtn.addEventListener("click", async () => {
+      if (!pendingStatus) return;
+
+      statusConfirmAcceptBtn.disabled = true;
+
+      try {
+        const response = await fetch(window.location.href, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "X-CSRFToken": getCookie("csrftoken"),
+          },
+          body: JSON.stringify({ type: "status", status: pendingStatus }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok || data.status === "error") {
+          throw new Error(data.message || "Ошибка запроса");
+        }
+
+        window.location.reload();
+      } catch (error) {
+        statusConfirmAcceptBtn.disabled = false;
+        statusConfirmModal.hide();
+        alert(error.message || "Не удалось сменить статус заказа.");
+      } finally {
+        pendingStatus = null;
+      }
+    });
+
+    // Сброс кнопки при закрытии окна без подтверждения
+    statusConfirmModalEl.addEventListener("hidden.bs.modal", () => {
+      statusConfirmAcceptBtn.disabled = false;
+      pendingStatus = null;
     });
   </script>
 {% endblock %}

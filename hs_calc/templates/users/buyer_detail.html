@@ -35,10 +35,14 @@
                     <td class="fw-bold">#{{ order.id }}</td>
                     <td>{{ order.created_at|date:"d.m.Y H:i" }}</td>
                     <td>
-                        {% if order.is_finished %}
-                            <span class="badge bg-success">Завершен</span>
+                        {% if order.status == "ordered" %}
+                            <span class="badge bg-secondary">{{ order.get_status_display }}</span>
+                        {% elif order.status == "in_work" %}
+                            <span class="badge bg-primary">{{ order.get_status_display }}</span>
+                        {% elif order.status == "done" %}
+                            <span class="badge bg-success">{{ order.get_status_display }}</span>
                         {% else %}
-                            <span class="badge bg-warning text-dark">В работе</span>
+                            <span class="badge bg-danger">{{ order.get_status_display }}</span>
                         {% endif %}
                     </td>
                     <td class="text-center">

@@ -9,7 +9,15 @@ class UniversalErrorMiddleware:
         response = self.get_response(request)
         ignored_codes = [403, 404]
 
-        if response.status_code >= 400 and response.status_code not in ignored_codes:
+        is_json_response = response.get("Content-Type", "").startswith(
+            "application/json",
+        )
+
+        if (
+            response.status_code >= 400
+            and response.status_code not in ignored_codes
+            and not is_json_response
+        ):
             return render(
                 request,
                 "errors/error.html",

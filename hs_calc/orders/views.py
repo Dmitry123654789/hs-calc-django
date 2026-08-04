@@ -23,6 +23,12 @@ from orders.models import Order
 from users.models import Buyer
 
 
+ORDER_STATUS_TRANSITIONS = {
+    Order.Status.Ordered: {Order.Status.In_work, Order.Status.Cancelled},
+    Order.Status.In_work: {Order.Status.Done, Order.Status.Cancelled},
+}
+
+
 def calculate_dealer_percentage(user):
     if user.profile.is_manager:
         return user.profile.percentage_sale
@@ -91,6 +97,12 @@ class OrderEditView(AdminRequiredMixin, DetailView):
     def get_queryset(self):
         return Order.objects.select_related("buyer")
 
+    def _all_items_finished(self):
+        return not (
+            self.object.portal_set.filter(is_finished=False).exists()
+            or self.object.glukhar_set.filter(is_finished=False).exists()
+        )
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
 
@@ -138,15 +150,38 @@ class OrderEditView(AdminRequiredMixin, DetailView):
 
         context["items"] = items
         context["details_json"] = dumps(details_by_key, default=str)
+
+        context["can_toggle_items"] = self.object.status == Order.Status.In_work
+        context["all_items_finished"] = self._all_items_finished()
+        context["available_transitions"] = [
+            {"value": status, "label": Order.Status(status).label}
+            for status in ORDER_STATUS_TRANSITIONS.get(self.object.status, set())
+        ]
+
         return context
 
     def post(self, request, *args, **kwargs):
         self.object = self.get_object()
         data = loads(request.body)
 
+        if data.get("type") == "status":
+            return self._handle_status_change(data)
+
+        return self._handle_item_toggle(data)
+
+    def _handle_item_toggle(self, data):
         item_type = data.get("type")
         item_id = data.get("id")
         is_finished = bool(data.get("is_finished"))
+
+        if not self.object.status == Order.Status.In_work:
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": "Нельзя отмечать элементы заказа, неверный статус заказа",
+                },
+                status=400,
+            )
 
         model = {"portal": Portal, "glukhar": Glukhar}.get(item_type)
         if model is None:
@@ -161,17 +196,38 @@ class OrderEditView(AdminRequiredMixin, DetailView):
         if not updated:
             raise Http404("Элемент заказа не найден")
 
-        order_finished = not (
-            self.object.portal_set.filter(is_finished=False).exists()
-            or self.object.glukhar_set.filter(is_finished=False).exists()
-        )
-        if order_finished != self.object.is_finished:
-            self.object.is_finished = order_finished
-            self.object.save(update_fields=["is_finished"])
-
         return JsonResponse(
-            {"status": "success", "order_is_finished": self.object.is_finished},
+            {
+                "status": "success",
+                "order_status": self.object.status,
+                "all_items_finished": self._all_items_finished(),
+            },
         )
+
+    def _handle_status_change(self, data):
+        new_status = data.get("status")
+        allowed = ORDER_STATUS_TRANSITIONS.get(self.object.status, set())
+
+        if new_status not in allowed:
+            return JsonResponse(
+                {"status": "error", "message": "Недопустимый переход статуса"},
+                status=400,
+            )
+
+        if new_status == Order.Status.Done and not self._all_items_finished():
+            return JsonResponse(
+                {
+                    "status": "error",
+                    "message": "Нельзя завершить заказ: не все элементы "
+                    "отмечены как выполненные",
+                },
+                status=400,
+            )
+
+        self.object.status = new_status
+        self.object.save(update_fields=["status"])
+
+        return JsonResponse({"status": "success", "order_status": self.object.status})
 
 
 class OrderFormView(ManagerRequiredMixin, View):

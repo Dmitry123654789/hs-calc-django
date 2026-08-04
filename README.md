@@ -1,3 +1,5 @@
+# HS Calc
+
 ## Установка и запуск
 
 ### 1. Клонирование репозитория и переход в папку проекта
@@ -88,6 +90,9 @@ python manage.py migrate
 ```bash
 python manage.py loaddata mydata
 ```
+
+Логин: admin
+Пароль: 12345678
 
 ### 8. Запуск сервера
 

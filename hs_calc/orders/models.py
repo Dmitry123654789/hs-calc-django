@@ -1,18 +1,25 @@
 from django.db.models import (
-    BooleanField,
     CASCADE,
+    CharField,
     DateTimeField,
     DecimalField,
     ForeignKey,
     Model,
     PositiveIntegerField,
     SET_NULL,
+    TextChoices,
 )
 
 from users.models import Buyer, CustomUser
 
 
 class Order(Model):
+    class Status(TextChoices):
+        Ordered = "ordered", "Заказано"
+        In_work = "in_work", "В работе"
+        Done = "done", "Выполнено"
+        Cancelled = "cancelled", "Отменено"
+
     delivery = PositiveIntegerField(
         verbose_name="Доставка",
     )
@@ -42,9 +49,11 @@ class Order(Model):
         blank=True,
         verbose_name="Покупатель",
     )
-    is_finished = BooleanField(
-        verbose_name="Завершен",
-        default=False,
+    status = CharField(
+        verbose_name="Цвет фурнитуры",
+        max_length=100,
+        choices=Status.choices,
+        default=Status.Ordered,
     )
     created_at = DateTimeField(
         verbose_name="Дата создания",
