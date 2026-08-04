@@ -19,6 +19,15 @@ class ManagerRequiredMixin(AdminRequiredMixin):
         return super().test_func() or user.profile.is_manager
 
 
+class OnlyWorkerRequiredMixin(LoginRequiredMixin, UserPassesTestMixin):
+    def test_func(self):
+        user = self.request.user
+        return user.profile.is_worker
+
+    def handle_no_permission(self):
+        return redirect("403")
+
+
 class BackURLMixin:
     def get_back_url(self):
         next_url = self.request.GET.get("next")

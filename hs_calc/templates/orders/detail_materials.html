@@ -1,0 +1,191 @@
+{% extends "base.html" %}
+{% load static %}
+
+{% block title %}Детали заказа #{{ order.id }}{% endblock %}
+
+{% block content %}
+<div class="container mt-4">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2>Детали расчета: Заказ #{{ order.id }}</h2>
+        <a href="{{ back_url }}" class="btn btn-outline-secondary">Назад к списку</a>
+    </div>
+
+    <ul class="nav nav-tabs mb-4" id="orderMainTabs" role="tablist">
+        {% if portals %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link active" id="portals-tab" data-bs-toggle="tab" data-bs-target="#portals-pane" type="button" role="tab" aria-controls="portals-pane" aria-selected="true">
+                Порталы
+            </button>
+        </li>
+        {% endif %}
+
+        {% if glukhars %}
+        <li class="nav-item" role="presentation">
+            <button class="nav-link {% if not portals %}active{% endif %}" id="glukhars-tab" data-bs-toggle="tab" data-bs-target="#glukhars-pane" type="button" role="tab" aria-controls="glukhars-pane" aria-selected="{% if not portals %}true{% else %}false{% endif %}">
+                Глухари
+            </button>
+        </li>
+        {% endif %}
+    </ul>
+
+    <div class="tab-content" id="orderMainTabsContent">
+
+        {% if portals %}
+        <div class="tab-pane fade show active" id="portals-pane" role="tabpanel" aria-labelledby="portals-tab">
+
+            <div class="tab-content" id="portalSubTabsContent">
+                <div class="tab-pane fade show active" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
+                    {% for product in portals %}
+                        {% if product.calculation_details.workpiece %}
+                            <h4 class="mt-4">Портал N{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }})</h4>
+                            {% for scheme_name, scheme_data in product.calculation_details.workpiece.items %}
+                                <div class="card mb-4 shadow-sm border-secondary">
+                                    <div class="card-header bg-primary text-white">
+                                        <h5 class="mb-0">Схема {{ scheme_name }} (Материалы)</h5>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <div class="table-responsive">
+                                            <table class="table table-bordered table-hover mb-0 align-middle main-table export-table"
+                                                   data-sheet-name="Портал_{{ product.calculation_details.N }}_{{ scheme_name }}"
+                                                   data-portal-n="{{ product.calculation_details.N }}"
+                                                   data-scheme-name="{{ scheme_name }}">
+                                                <thead class="table-dark">
+                                                    <tr>
+                                                        <th>ВИД</th>
+                                                        <th>РАЗМЕР, мм</th>
+                                                        <th>КОЛ-ВО</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {% for detail_name, detail_data in scheme_data.items %}
+                                                        {% if detail_data and detail_data.price is not None %}
+                                                            {% for size, count in detail_data.w_list.items %}
+                                                                {% if size != 0 and size != "0" and count != 0 %}
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                                                    <td class="cell-name">{{ detail_name }}</td>
+                                                                    <td>{{ size }}</td>
+                                                                    <td>{{ count }}</td>
+                                                                </tr>
+                                                                {% endif %}
+                                                            {% endfor %}
+
+                                                            {% for size, count in detail_data.h_list.items %}
+                                                                {% if size != 0 and size != "0" and count != 0 %}
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                                                    <td class="cell-name">{{ detail_name }}</td>
+                                                                    <td>{{ size }}</td>
+                                                                    <td>{{ count }}</td>
+                                                                </tr>
+                                                                {% endif %}
+                                                            {% endfor %}
+                                                        {% endif %}
+                                                    {% endfor %}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </div>
+                                </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+        {% if glukhars %}
+        <div class="tab-pane fade {% if not portals %}show active{% endif %}" id="glukhars-pane" role="tabpanel" aria-labelledby="glukhars-tab">
+            {% for product in glukhars %}
+                <h4 class="mt-4">Глухарь N{{ product.calculation_details.N|default:forloop.counter }} (Ш:{{ product.width }} x В:{{ product.height }})</h4>
+                <div class="card mb-4 shadow-sm">
+                    <div class="card-body p-0">
+                        <div class="table-responsive">
+                            <table class="table table-bordered table-hover mb-0 align-middle export-table"
+                                   data-sheet-name="Глухарь_{{ product.calculation_details.N|default:forloop.counter }}"
+                                   data-glukhar-n="{{ product.calculation_details.N|default:forloop.counter }}">
+                                <thead class="table-dark">
+                                    <tr>
+                                        <th>Наименование</th>
+                                        <th>Длина/Размер</th>
+                                        <th>Кол-во</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {% for key, val in product.calculation_details.items %}
+                                        {% if key != 'type' and key != 'N' and key != 'ИТОГО' %}
+                                        <tr>
+                                            <td>{{ key }}</td>
+                                            <td>
+                                                {% if val.length.w %}
+                                                    {{ val.length.w }} x {{ val.length.h }}
+                                                {% else %}
+                                                    {{ val.length }}
+                                                {% endif %}
+                                            </td>
+                                            <td>{{ val.N_amount }}</td>
+                                        </tr>
+                                        {% endif %}
+                                    {% endfor %}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    {% if portals or glukhars %}
+    <div class="mt-4 mb-5">
+        <button type="button" id="exportExcelBtn" class="btn btn-success">
+            <i class="bi bi-file-earmark-excel"></i> Скачать в Excel
+        </button>
+    </div>
+    {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{% static 'js/xlsx.full.min.js' %}"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Объединение повторяющихся ВИД через rowspan — как в detail.html
+        document.querySelectorAll(".main-table").forEach(function(table) {
+            const rows = table.querySelectorAll("tbody tr.detail-row");
+            let currentDetail = null;
+            let startRowIdx = 0;
+            let currentSpan = 0;
+
+            rows.forEach(function(row, index) {
+                const detailName = row.getAttribute("data-detail-name");
+
+                if (currentDetail === null) {
+                    currentDetail = detailName;
+                    startRowIdx = index;
+                    currentSpan = 1;
+                } else if (currentDetail === detailName) {
+                    currentSpan++;
+                    row.querySelector(".cell-name").remove();
+                } else {
+                    const firstRowOfGroup = rows[startRowIdx];
+                    firstRowOfGroup.querySelector(".cell-name").setAttribute("rowspan", currentSpan);
+
+                    currentDetail = detailName;
+                    startRowIdx = index;
+                    currentSpan = 1;
+                }
+            });
+
+            if (currentSpan > 0 && rows.length > 0) {
+                const firstRowOfGroup = rows[startRowIdx];
+                firstRowOfGroup.querySelector(".cell-name").setAttribute("rowspan", currentSpan);
+            }
+        });
+    });
+
+    document.getElementById("exportExcelBtn")?.addEventListener("click", function() {
+        alert("реализовать генерацию excel файла с помощью xlsx.full.min.js")
+    });
+</script>
+{% endblock %}

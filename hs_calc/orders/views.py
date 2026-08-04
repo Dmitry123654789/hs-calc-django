@@ -18,7 +18,7 @@ from calculate.models import (
     Scheme,
 )
 from calculate.services import calculate_glukhar, calculate_portals
-from core.mixins import AdminRequiredMixin, BackURLMixin, ManagerRequiredMixin
+from core.mixins import BackURLMixin, ManagerRequiredMixin, OnlyWorkerRequiredMixin
 from orders.models import Order
 from users.models import Buyer
 
@@ -56,7 +56,7 @@ def serialize_product(instance):
     return result
 
 
-class OrderListView(AdminRequiredMixin, ListView):
+class OrderListView(ListView):
     model = Order
     template_name = "orders/list.html"
     context_object_name = "orders_data"
@@ -65,7 +65,7 @@ class OrderListView(AdminRequiredMixin, ListView):
         return Order.objects.select_related("buyer").order_by("-created_at")
 
 
-class OrderDetailView(BackURLMixin, AdminRequiredMixin, DetailView):
+class OrderDetailView(BackURLMixin, ManagerRequiredMixin, DetailView):
     model = Order
     template_name = "orders/detail.html"
     context_object_name = "order"
@@ -90,7 +90,20 @@ class OrderDetailView(BackURLMixin, AdminRequiredMixin, DetailView):
         return context
 
 
-class OrderEditView(BackURLMixin, AdminRequiredMixin, DetailView):
+class OrderDetailMaterialsView(BackURLMixin, OnlyWorkerRequiredMixin, DetailView):
+    model = Order
+    template_name = "orders/detail_materials.html"
+    context_object_name = "order"
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context["portals"] = self.object.portal_set.all()
+        context["glukhars"] = self.object.glukhar_set.all()
+        context["back_url"] = self.get_back_url()
+        return context
+
+
+class OrderEditView(BackURLMixin, DetailView):
     model = Order
     template_name = "orders/edit.html"
     context_object_name = "order"

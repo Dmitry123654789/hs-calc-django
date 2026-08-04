@@ -41,9 +41,15 @@
                         {% endif %}
                     </td>
                     <td class="text-center">
-                        <a href="{% url 'orders:orders_detail' order.id %}" class="btn btn-sm btn-success me-2">
-                            <i class="bi bi-calculator"></i> Расчеты
-                        </a>
+                        {% if user.profile.is_director or user.profile.is_manager %}
+                            <a href="{% url 'orders:orders_detail' order.id %}" class="btn btn-sm btn-success me-2">
+                                <i class="bi bi-calculator"></i> Расчеты
+                            </a>
+                        {% else %}
+                            <a href="{% url 'orders:orders_detail_materials' order.id %}" class="btn btn-sm btn-success me-2">
+                                <i class="bi bi-calculator"></i> Материалы
+                            </a>
+                        {% endif %}
                         <a href="{% url 'orders:orders_edit' order.id %}" class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-pencil"></i> Изменить
                         </a>

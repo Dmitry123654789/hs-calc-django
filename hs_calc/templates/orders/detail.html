@@ -208,12 +208,7 @@
             
             <div class="input-group" style="width: auto;">
                 <select class="form-select form-select-sm" id="excelExportType" style="max-width: 280px;">
-                    <option value="all">Весь заказ (Все таблицы)</option>
-                    {% if portals %}
-                    <option value="portal_all">Порталы: все данные</option>
-                    <option value="portal_materials">Порталы: только материалы</option>
-                    <option value="portal_labor">Порталы: только трудозатраты</option>
-                    {% endif %}
+                    <option value="all">Что-то</option>
                 </select>
                 <button class="btn btn-success btn-sm" type="button" onclick="triggerExcelExport()">
                     <i class="bi bi-file-earmark-excel"></i> Сохранить в Excel
@@ -247,9 +242,13 @@
                         <td>{{ order.percentage_worker }}%</td>
                         <td class="fw-bold">{{ dealer_amount }} руб.</td>
                         <td>
+                            {% if user.profile.is_director %}
                             <a href="{% url 'users:admin_user_detail' order.creator.pk %}">
                                 {{ order.creator.get_full_name|default:order.creator.username }}
                             </a>
+                            {% else %}
+                                {{ order.creator.get_full_name|default:order.creator.username }}
+                            {% endif %}
                         </td>
                     </tr>
                 </tbody>
@@ -336,61 +335,9 @@
 
     // Функция-обертка для чтения значения селекта и запуска выгрузки
     function triggerExcelExport() {
-        const selectElem = document.getElementById('excelExportType');
-        const scope = selectElem ? selectElem.value : 'all';
-        exportOrderToExcel(scope);
+        alert("реализовать генерацию excel файла с помощью xlsx.full.min.js")
+        // TODO: реализовать генерацию excel файла с помощью xlsx.full.min.js
     }
 
-    function exportOrderToExcel(scope) {
-        if (typeof XLSX === 'undefined') {
-            alert('Ошибка: Библиотека xlsx.full.min.js не загружена.');
-            return;
-        }
-
-        try {
-            const wb = XLSX.utils.book_new();
-            let selector = '';
-            let fileNameSuffix = '';
-
-            switch(scope) {
-                case 'portal_materials':
-                    selector = '.main-table';
-                    fileNameSuffix = 'Порталы_Материалы';
-                    break;
-                case 'portal_labor':
-                    selector = '.labor-table';
-                    fileNameSuffix = 'Порталы_Трудозатраты';
-                    break;
-                case 'portal_all':
-                    selector = '.main-table, .labor-table';
-                    fileNameSuffix = 'Порталы_Все';
-                    break;
-                case 'all':
-                default:
-                    selector = '.export-table';
-                    fileNameSuffix = 'Полная_Спецификация';
-                    break;
-            }
-
-            const tables = document.querySelectorAll(selector);
-
-            if (tables.length === 0) {
-                alert('Нет доступных таблиц для выгрузки по выбранным критериям.');
-                return;
-            }
-
-            tables.forEach((table, index) => {
-                let ws = XLSX.utils.table_to_sheet(table);
-                let sheetName = table.getAttribute('data-sheet-name') || `Лист_${index + 1}`;
-                sheetName = sheetName.substring(0, 31).replace(/[\\/?*\[\]]/g, ''); 
-                XLSX.utils.book_append_sheet(wb, ws, sheetName);
-            });
-
-            XLSX.writeFile(wb, `Заказ_N{{ order.id }}_${fileNameSuffix}.xlsx`);
-        } catch (error) {
-            console.error("Ошибка при генерации Excel: ", error);
-            alert('Произошла ошибка при формировании Excel файла.');
-        }
-    }
 </script>
 {% endblock %}

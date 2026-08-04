@@ -13,7 +13,11 @@
       <dt class="col-sm-3">Покупатель</dt>
       <dd class="col-sm-9">
         {% if order.buyer %}
-          <a href="{% url 'users:buyer_detail' order.buyer.pk %}">{{ order.buyer }}</a>
+          {% if user.profile.is_director %}
+            <a href="{% url 'users:buyer_detail' order.buyer.pk %}">{{ order.buyer }}</a>
+          {% else %}
+            {{ order.buyer }}
+          {% endif %}
         {% else %}
           —
         {% endif %}
