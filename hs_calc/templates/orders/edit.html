@@ -4,11 +4,20 @@
 {% block title %}Редактирование заказа №{{ order.id }}{% endblock %}
 
 {% block content %}
-  <h1 class="h3 mb-4">Заказ №{{ order.id }}({{ order.created_at|date:"Y-m-d H:i" }})</h1>
+  <div class="d-flex justify-content-between align-items-center mb-4">
+      <h2>Заказ №{{ order.id }}({{ order.created_at|date:"Y-m-d H:i" }})</h2>
+      <a href="{{ back_url }}" class="btn btn-outline-secondary">Назад к списку</a>
+  </div>
 
   <dl class="row">
-    <dt class="col-sm-3">Покупатель</dt>
-    <dd class="col-sm-9">{{ order.buyer|default:"—" }}</dd>
+      <dt class="col-sm-3">Покупатель</dt>
+      <dd class="col-sm-9">
+        {% if order.buyer %}
+          <a href="{% url 'users:buyer_detail' order.buyer.pk %}">{{ order.buyer }}</a>
+        {% else %}
+          —
+        {% endif %}
+      </dd>
 
     <dt class="col-sm-3">Статус</dt>
     <dd class="col-sm-9 d-flex align-items-center gap-3 flex-wrap">
@@ -36,7 +45,6 @@
 
   {% if not can_toggle_items %}
     <div class="alert alert-warning">
-      Заказ ещё не утверждён — отмечать элементы как выполненные нельзя.
       Переведите заказ в статус «В работе», чтобы открыть чекбоксы.
     </div>
   {% endif %}

@@ -7,7 +7,7 @@
 <div class="container mt-4">
     <div class="d-flex justify-content-between align-items-center mb-4">
         <h2>Детали расчета: Заказ #{{ order.id }}</h2>
-        <a href="{% url 'orders:orders_list' %}" class="btn btn-outline-secondary">Назад к списку</a>
+        <a href="{{ back_url }}" class="btn btn-outline-secondary">Назад к списку</a>
     </div>
 
     <ul class="nav nav-tabs mb-4" id="orderMainTabs" role="tablist">
@@ -246,7 +246,11 @@
                         <td class="fw-bold table-success">{{ order.total_sum }} руб.</td>
                         <td>{{ order.percentage_worker }}%</td>
                         <td class="fw-bold">{{ dealer_amount }} руб.</td>
-                        <td>{{ order.creator.get_full_name|default:order.creator.username }}</td>
+                        <td>
+                            <a href="{% url 'users:admin_user_detail' order.creator.pk %}">
+                                {{ order.creator.get_full_name|default:order.creator.username }}
+                            </a>
+                        </td>
                     </tr>
                 </tbody>
             </table>

@@ -129,6 +129,21 @@ class AdminUserDetailView(AdminRequiredMixin, DetailView):
     template_name = "users/admin_user_detail.html"
     context_object_name = "target_user"
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+
+        orders_created = Order.objects.filter(
+            creator=self.object,
+        ).select_related("buyer").order_by("-created_at")
+
+        paginator = Paginator(orders_created, 10)
+        page_number = self.request.GET.get("page")
+        page_obj = paginator.get_page(page_number)
+
+        context["page_obj"] = page_obj
+        context["orders_count"] = orders_created.count()
+        return context
+
 
 class AdminUserDeleteView(AdminRequiredMixin, DeleteView):
     model = CustomUser

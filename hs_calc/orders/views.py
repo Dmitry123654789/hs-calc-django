@@ -18,7 +18,7 @@ from calculate.models import (
     Scheme,
 )
 from calculate.services import calculate_glukhar, calculate_portals
-from core.mixins import AdminRequiredMixin, ManagerRequiredMixin
+from core.mixins import AdminRequiredMixin, BackURLMixin, ManagerRequiredMixin
 from orders.models import Order
 from users.models import Buyer
 
@@ -65,7 +65,7 @@ class OrderListView(AdminRequiredMixin, ListView):
         return Order.objects.select_related("buyer").order_by("-created_at")
 
 
-class OrderDetailView(AdminRequiredMixin, DetailView):
+class OrderDetailView(BackURLMixin, AdminRequiredMixin, DetailView):
     model = Order
     template_name = "orders/detail.html"
     context_object_name = "order"
@@ -77,6 +77,7 @@ class OrderDetailView(AdminRequiredMixin, DetailView):
         context = super().get_context_data(**kwargs)
         context["portals"] = self.object.portal_set.all()
         context["glukhars"] = self.object.glukhar_set.all()
+        context["back_url"] = self.get_back_url()
 
         dealer_percentage = self.object.percentage_worker or Decimal("0")
         total_sum = self.object.total_sum or Decimal("0")
@@ -89,7 +90,7 @@ class OrderDetailView(AdminRequiredMixin, DetailView):
         return context
 
 
-class OrderEditView(AdminRequiredMixin, DetailView):
+class OrderEditView(BackURLMixin, AdminRequiredMixin, DetailView):
     model = Order
     template_name = "orders/edit.html"
     context_object_name = "order"
@@ -105,6 +106,8 @@ class OrderEditView(AdminRequiredMixin, DetailView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
+
+        context["back_url"] = self.get_back_url()
 
         portals = self.object.portal_set.select_related(
             "color_type",

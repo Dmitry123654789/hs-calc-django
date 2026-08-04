@@ -46,10 +46,10 @@
                         {% endif %}
                     </td>
                     <td class="text-center">
-                        <a href="{% url 'orders:orders_detail' order.id %}" class="btn btn-sm btn-success me-2">
+                        <a href="{% url 'orders:orders_detail' order.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-success me-2">
                             <i class="bi bi-calculator"></i> Расчеты
                         </a>
-                        <a href="{% url 'orders:orders_edit' order.id %}" class="btn btn-sm btn-outline-secondary">
+                        <a href="{% url 'orders:orders_edit' order.id %}?next={{ request.get_full_path|urlencode }}" class="btn btn-sm btn-outline-secondary">
                             <i class="bi bi-pencil"></i> Изменить
                         </a>
                     </td>
