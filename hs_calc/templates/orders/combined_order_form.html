@@ -253,7 +253,6 @@
 <script>
 document.addEventListener('DOMContentLoaded', function () {
     const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
-    const glukharProfitRatio = parseFloat('{{ glukhar_profit_ratio }}') || 1.0;
     const isAdmin = {{ is_admin|yesno:"true,false" }};
     const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
     let lastGrandTotal = 0;
@@ -532,8 +531,8 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderResults() {
-        const portalTotalWithRatio = portalCalcResult ? (portalCalcResult['ИТОГО_С_КОЭФФИЦИЕНТОМ'] || 0) : 0;
-        const glukharTotalRaw = glukharCalcResult ? (glukharCalcResult['ИТОГО'] || 0) : 0;
+        const portalTotalWithRatio = portalCalcResult ? (parseFloat(portalCalcResult['ИТОГО_С_КОЭФФИЦИЕНТОМ']) || 0) : 0;
+        const glukharTotalWithRatio = glukharCalcResult ? (parseFloat(glukharCalcResult['ИТОГО_С_КОЭФФИЦИЕНТОМ']) || 0) : 0;
 
         let html = '<h3 class="mb-3 border-bottom pb-2">📊 Результаты расчета</h3>';
 
@@ -625,13 +624,12 @@ document.addEventListener('DOMContentLoaded', function () {
             const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
-            const totalArea = portalArea + glukharArea;
-            const finalTotal = portalTotalWithRatio
-                + (glukharTotalRaw * glukharProfitRatio)
+            // Округляем сумму до 3 знаков после запятой и превращаем обратно в число
+            const totalArea = Number((portalArea + glukharArea).toFixed(2));
+            const finalTotal = portalTotalWithRatio + glukharTotalWithRatio +
                 + (totalArea * installRate) + delivery + unloading - discount;
 
             lastGrandTotal = finalTotal;
-
             document.getElementById('dynamicGrandTotal').textContent =
                 `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
 

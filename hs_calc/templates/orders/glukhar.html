@@ -412,7 +412,7 @@
         function enforceMinimumsAndRecalculate() {
             const finalTotal = getFinalTotal();
             lastGrandTotal = finalTotal;
-            document.getElementById('dynamicGrandTotal').textContent = `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toFixed(2)} руб.`;
+            document.getElementById('dynamicGrandTotal').textContent = `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
 
             if (!isAdmin) {
                 const dealerAmount = Math.round(dealerPercentage / 100 * finalTotal);

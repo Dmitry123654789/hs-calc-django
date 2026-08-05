@@ -248,8 +248,6 @@ class OrderEditView(BackURLMixin, DetailView):
 
 class OrderFormView(ManagerRequiredMixin, View):
     def get(self, request):
-        glukhar_ratio = float(ProfitRatio.objects.get(name="glukhar").ratio)
-
         schemes = list(
             Scheme.objects.values("id", "name", "min_size", "max_size", "ratio"),
         )
@@ -260,7 +258,6 @@ class OrderFormView(ManagerRequiredMixin, View):
         )
 
         context = {
-            "glukhar_profit_ratio": glukhar_ratio,
             "schemes_json": dumps(schemes, default=str),
             "is_admin": is_admin,
             "dealer_percentage": dealer_percentage,

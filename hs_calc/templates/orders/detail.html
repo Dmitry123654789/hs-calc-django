@@ -51,7 +51,7 @@
                     {% for product in portals %}
                         {% if product.calculation_details.workpiece %}
                             <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
-                                Портал №{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
+                                Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
                                 <span class="fs-6 fw-normal text-muted product-area-display"></span>
                             </h4>
                             {% for scheme_name, scheme_data in product.calculation_details.workpiece.items %}
@@ -116,7 +116,7 @@
                     {% for product in portals %}
                         {% if product.calculation_details.workpiece and product.calculation_details.work_data %}
                             <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
-                                Портал №{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
+                                Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
                                 <span class="fs-6 fw-normal text-muted product-area-display"></span>
                             </h4>
                             {% for labor_scheme, labor_details in product.calculation_details.work_data.items %}
@@ -163,7 +163,7 @@
         <div class="tab-pane fade {% if not portals %}show active{% endif %}" id="glukhars-pane" role="tabpanel" aria-labelledby="glukhars-tab">
             {% for product in glukhars %}
                 <h4 class="mt-4 product-header" data-product-id="glukhar-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
-                    Глухарь №{{ product.calculation_details.N|default:forloop.counter }} (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
+                    Глухарь (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
                     <span class="fs-6 fw-normal text-muted product-area-display"></span>
                 </h4>
                 <div class="card mb-4 shadow-sm">

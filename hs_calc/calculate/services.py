@@ -1115,9 +1115,12 @@ def get_all_price(result: dict) -> Decimal:
     return price
 
 
-def calculate_glukhar(glukhar_data: list) -> dict:
+def calculate_glukhar(glukhar_data: list, ratio="1") -> dict:
     result = {}
     total_price = ZERO
+    total_price_with_ratio = ZERO  # Добавляем переменную для общей суммы с коэффициентом
+
+    ratio_dec = to_decimal(ratio)
 
     for glukhar in glukhar_data:
         name = glukhar["name"]
@@ -1181,19 +1184,26 @@ def calculate_glukhar(glukhar_data: list) -> dict:
         }
 
         item_total = get_all_price(result[name])
+        n_price_total = money(item_total * amount_dec)
 
         result[name]["ИТОГО"] = {
             "price": item_total,
             "length": "-",
             "amount": 1,
             "N_amount": amount_dec,
-            "N_price": money(item_total * amount_dec),
+            "N_price": n_price_total,
         }
 
         result[name]["type"] = "glukhar"
 
-        total_price += result[name]["ИТОГО"]["N_price"]
+        price_with_ratio = money(n_price_total * ratio_dec)
+        result[name]["price_with_ratio"] = price_with_ratio
+
+        total_price += n_price_total
+        total_price_with_ratio += price_with_ratio
 
     result["ИТОГО"] = money(total_price)
+    result["ИТОГО_С_КОЭФФИЦИЕНТОМ"] = money(total_price_with_ratio)
+    result["ratio"] = as_number(ratio_dec)
 
     return result
