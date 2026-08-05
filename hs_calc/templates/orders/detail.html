@@ -50,7 +50,10 @@
                 <div class="tab-pane fade show active" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
                     {% for product in portals %}
                         {% if product.calculation_details.workpiece %}
-                            <h4 class="mt-4">Портал N{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }})</h4>
+                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                                Портал №{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
+                                <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                            </h4>
                             {% for scheme_name, scheme_data in product.calculation_details.workpiece.items %}
                                 <div class="card mb-4 shadow-sm border-secondary">
                                     <div class="card-header bg-primary text-white">
@@ -112,7 +115,10 @@
                 <div class="tab-pane fade" id="portal-labor-pane" role="tabpanel" aria-labelledby="portal-labor-tab">
                     {% for product in portals %}
                         {% if product.calculation_details.workpiece and product.calculation_details.work_data %}
-                            <h4 class="mt-4">Портал N{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }})</h4>
+                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                                Портал №{{ product.calculation_details.N }} (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
+                                <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                            </h4>
                             {% for labor_scheme, labor_details in product.calculation_details.work_data.items %}
                             <div class="card mb-5 shadow-sm border-info">
                                 <div class="card-header bg-info text-dark">
@@ -156,7 +162,10 @@
         {% if glukhars %}
         <div class="tab-pane fade {% if not portals %}show active{% endif %}" id="glukhars-pane" role="tabpanel" aria-labelledby="glukhars-tab">
             {% for product in glukhars %}
-                <h4 class="mt-4">Глухарь N{{ product.calculation_details.N|default:forloop.counter }} (Ш:{{ product.width }} x В:{{ product.height }})</h4>
+                <h4 class="mt-4 product-header" data-product-id="glukhar-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                    Глухарь №{{ product.calculation_details.N|default:forloop.counter }} (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
+                    <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                </h4>
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body p-0">
                         <div class="table-responsive">
@@ -219,28 +228,35 @@
             </div>
         </div>
         <div class="card-body p-0">
+            <!-- Таблица разбита на две строки, чтобы избежать лишней ширины -->
             <table class="table table-bordered mb-0 text-center align-middle bg-white export-table" id="extra-costs-table" data-sheet-name="Доп_Услуги">
                 <thead class="table-light">
                     <tr>
                         <th>Скидка</th>
                         <th>Доставка</th>
-                        <th>Установка (Монтаж)</th>
                         <th>Разгрузка</th>
-                        <th>Итого по заказу</th>
-                        <th>Процент дилера</th>
-                        <th>Сумма дилера</th>
-                        <th>Создал</th>
+                        <th>Ставка монтажа</th>
+                        <th>Стоимость монтажа</th>
                     </tr>
                 </thead>
                 <tbody>
                     <tr class="fs-5">
                         <td class="text-danger fw-bold">-{{ order.discount }} руб.</td>
                         <td>{{ order.delivery }} руб.</td>
-                        <td>{{ order.installation }} руб.</td>
                         <td>{{ order.unloading }} руб.</td>
-                        <td class="fw-bold table-success">{{ order.total_sum }} руб.</td>
+                        <td id="install-rate" data-rate="{{ order.installation }}">{{ order.installation }} руб.</td>
+                        <td id="install-total">0.00 руб.</td>
+                    </tr>
+                    <tr class="table-light fw-bold">
+                        <th colspan="2">Итого по заказу</th>
+                        <th>Процент дилера</th>
+                        <th>Сумма дилера</th>
+                        <th>Создал</th>
+                    </tr>
+                    <tr class="fs-5">
+                        <td colspan="2" class="fw-bold table-success">{{ order.total_sum }} руб.</td>
                         <td>{{ order.percentage_worker }}%</td>
-                        <td class="fw-bold">{{ dealer_amount }} руб.</td>
+                        <td>{{ dealer_amount }} руб.</td>
                         <td>
                             {% if user.profile.is_director %}
                             <a href="{% url 'users:admin_user_detail' order.creator.pk %}">
@@ -262,6 +278,46 @@
 <script src="{% static 'js/xlsx.full.min.js' %}"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
+        // Подсчет площади изделий и стоимости установки
+        let totalArea = 0;
+        let processedProducts = new Set();
+
+        document.querySelectorAll('.product-header').forEach(function(header) {
+            const productId = header.getAttribute('data-product-id');
+            const w = parseFloat(header.getAttribute('data-width')) || 0;
+            const h = parseFloat(header.getAttribute('data-height')) || 0;
+            const amount = parseInt(header.getAttribute('data-amount')) || 1;
+            
+            // Перевод мм в метры квадратные
+            const area = (w * h) / 1000000;
+            const totalProductArea = area * amount;
+            
+            // Избегаем двойного учета площади для порталов из-за наличия двух вкладок 
+            if (productId && !processedProducts.has(productId)) {
+                totalArea += totalProductArea;
+                processedProducts.add(productId);
+            }
+            
+            let areaText = ` | Площадь 1 шт: ${area.toFixed(2)} м²`;
+            if (amount > 1) {
+                areaText += ` (Общая: ${totalProductArea.toFixed(2)} м²)`;
+            }
+            
+            const display = header.querySelector('.product-area-display');
+            if (display) {
+                display.textContent = areaText;
+            }
+        });
+
+        // Расчет общей стоимости установки в таблице итогов
+        const rateCell = document.getElementById('install-rate');
+        const totalCell = document.getElementById('install-total');
+        if (rateCell && totalCell) {
+            const rate = parseFloat(rateCell.getAttribute('data-rate')) || 0;
+            const installCost = totalArea * rate;
+            totalCell.textContent = installCost.toFixed(2) + ' руб.';
+        }
+
         // Подсчет rowspan и итогов для Порталов (Материалы)
         document.querySelectorAll(".main-table").forEach(function(table) {
             const rows = table.querySelectorAll("tbody tr.detail-row");
@@ -338,6 +394,5 @@
         alert("реализовать генерацию excel файла с помощью xlsx.full.min.js")
         // TODO: реализовать генерацию excel файла с помощью xlsx.full.min.js
     }
-
 </script>
 {% endblock %}

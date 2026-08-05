@@ -16,7 +16,6 @@ urlpatterns = [
     path("calculate/", include(calculate.urls)),
     path("order/", include(orders.urls)),
     path("", include(about.urls)),
-
     path("403/", NotPermissionView.as_view(), name="403"),
 ]
 

@@ -444,7 +444,6 @@ class SaveGlukharOrderView(ManagerRequiredMixin, View):
                 key = glukhar["name"]
 
                 glukhar_details = dict(calc_results[key])
-
                 Glukhar.objects.create(
                     width=int(width),
                     height=int(height),
