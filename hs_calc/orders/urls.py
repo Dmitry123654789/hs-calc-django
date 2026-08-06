@@ -31,4 +31,9 @@ urlpatterns = [
         views.CombinedOrderSaveView.as_view(),
         name="combined_order_save",
     ),
+    path(
+        "<int:pk>/download-kp/",
+        views.OrderDownloadKPView.as_view(),
+        name="download_kp",
+    ),
 ]

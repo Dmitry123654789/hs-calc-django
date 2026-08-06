@@ -117,6 +117,10 @@
         let baseTotalPrice = 0;
         let totalArea = 0;
         let lastGrandTotal = 0;
+        let savedOrderId = null;
+        // Шаблон ссылки на скачивание КП с плейсхолдером id=0, который
+        // подменяем на реальный order_id после сохранения заказа.
+        const downloadKpUrlTemplate = "{% url 'orders:download_kp' 0 %}";
 
         const isAdmin = {{ is_admin|yesno:"true,false" }};
         const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
@@ -328,10 +332,7 @@
                     const rowData = glukhar[rowKey];
                     if (rowData === undefined) continue;
 
-                    if (item.isSimpleNumber && typeof rowData === 'number') {
-                        if (item.display === 'Выгрузка' && rowData === 0) continue;
-                        html += `<tr><td>${item.display}</td><td>${rowData.toFixed(2)}</td><td>—</td><td>1</td><td>${N_amount}</td><td>${(rowData*N_amount).toFixed(2)}</td></tr>`;
-                    } else if (typeof rowData === 'object' && rowData !== null) {
+                    if (typeof rowData === 'object' && rowData !== null) {
                         let sizeText = '—';
                         if (rowData.length && typeof rowData.length === 'object') sizeText = `${rowData.length.w} x ${rowData.length.h}`;
                         else if (rowData.length !== undefined && rowData.length !== '-') sizeText = rowData.length;
@@ -403,9 +404,9 @@
             document.getElementById('downloadKpBtn').onclick = () => downloadKp();
         }
 
-        // Кнопка "Скачать КП" — пока ничего не делает, функционал будет добавлен позже.
         function downloadKp() {
-            // TODO: реализовать генерацию и скачивание docx-файла с коммерческим предложением.
+            if (!savedOrderId) return;
+            window.location.href = downloadKpUrlTemplate.replace('/0/', `/${savedOrderId}/`);
         }
 
         // 5. Логика динамического пересчета и контроля минимумов
@@ -480,6 +481,7 @@
                     showAlert(`Заказ успешно сохранен!`, 'success');
                     btnElement.innerHTML = 'Заказ сохранен';
                     btnElement.classList.replace('btn-primary', 'btn-secondary');
+                    savedOrderId = data.order_id;
                     const kpBtn = document.getElementById('downloadKpBtn');
                     if (kpBtn) kpBtn.style.display = 'inline-block';
                 } else {

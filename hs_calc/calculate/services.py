@@ -670,7 +670,10 @@ def calculate_color(color: str, scheme_name: str, portal_width, portal_height) -
 
 
 def calculate_glass(
-    scheme_name: str, glass_type: str, portal_width, portal_height,
+    scheme_name: str,
+    glass_type: str,
+    portal_width,
+    portal_height,
 ) -> dict:
     glass_door_w_sub = get_sub_num("door", scheme_name)
     glass_sash_w_sub = get_sub_num("sash", scheme_name)
@@ -1159,7 +1162,6 @@ def calculate_glukhar(glukhar_data: list, ratio="1") -> dict:
             not_rectangle,
         )
 
-        result[name]["Выгрузка"] = glass_info.pop("unloading")
         result[name]["Стеклопакет"] = glass_info
 
         area = to_decimal(width) * to_decimal(height) / MILLION

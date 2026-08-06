@@ -118,7 +118,7 @@
                                 </thead>
                                 <tbody>
                                     {% for key, val in product.calculation_details.items %}
-                                        {% if key != 'type' and key != 'N' and key != 'ИТОГО' %}
+                                        {% if key != 'type' and key != 'N' and key != 'ИТОГО' and key != 'price_with_ratio' %}
                                         <tr>
                                             <td>{{ key }}</td>
                                             <td>

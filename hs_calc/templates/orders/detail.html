@@ -181,7 +181,7 @@
                                 </thead>
                                 <tbody>
                                     {% for key, val in product.calculation_details.items %}
-                                        {% if key != 'type' and key != 'N' and key != 'ИТОГО' %}
+                                        {% if key != 'type' and key != 'N' and key != 'ИТОГО' and key != 'price_with_ratio' %}
                                         <tr>
                                             <td>{{ key }}</td>
                                             <td>{{ val.price }}</td>
@@ -384,9 +384,11 @@
         });
     });
 
-    // Кнопка "Скачать КП" — пока ничего не делает, функционал будет добавлен позже.
+    // Кнопка "Скачать КП": просто переходим по ссылке на скачивание —
+    // заказ уже сохранен в базе (мы на странице деталей заказа), браузер
+    // сам скачает файл благодаря заголовку Content-Disposition.
     function downloadKp() {
-        // TODO: реализовать генерацию и скачивание docx-файла с коммерческим предложением.
+        window.location.href = "{% url 'orders:download_kp' order.pk %}";
     }
 
     // Функция-обертка для чтения значения селекта и запуска выгрузки

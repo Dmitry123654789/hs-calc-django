@@ -2,8 +2,8 @@ from decimal import Decimal, ROUND_HALF_UP
 from json import dumps, loads
 
 from django.db import transaction
-from django.http import Http404, JsonResponse
-from django.shortcuts import render
+from django.http import Http404, HttpResponse, JsonResponse
+from django.shortcuts import get_object_or_404, render
 from django.views.generic import DetailView, ListView, View
 
 from calculate.models import (
@@ -19,6 +19,7 @@ from calculate.models import (
 )
 from calculate.services import calculate_glukhar, calculate_portals
 from core.mixins import BackURLMixin, ManagerRequiredMixin, OnlyWorkerRequiredMixin
+from orders.kp_export import build_commercial_proposal
 from orders.models import Order
 from users.models import Buyer
 
@@ -88,6 +89,27 @@ class OrderDetailView(BackURLMixin, ManagerRequiredMixin, DetailView):
         )
 
         return context
+
+
+class OrderDownloadKPView(ManagerRequiredMixin, View):
+    """Отдает .docx коммерческое предложение по заказу для скачивания."""
+
+    def get(self, request, pk, *args, **kwargs):
+        order = get_object_or_404(Order.objects.select_related("buyer"), pk=pk)
+
+        buffer = build_commercial_proposal(order)
+
+        response = HttpResponse(
+            buffer.getvalue(),
+            content_type=(
+                "application/vnd.openxmlformats-officedocument"
+                ".wordprocessingml.document"
+            ),
+        )
+        response["Content-Disposition"] = (
+            f'attachment; filename="KP_zakaz_{order.pk}.docx"'
+        )
+        return response
 
 
 class OrderDetailMaterialsView(BackURLMixin, OnlyWorkerRequiredMixin, DetailView):
