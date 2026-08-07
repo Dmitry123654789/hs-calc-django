@@ -29,13 +29,12 @@ docx-файл, повторяя блок "изделие" столько раз,
 ВАЖНО — места, которые нужно донастроить под реальный проект (см. пометки
 "# НАСТРОЙКА:" по тексту):
 
-1. get_product_price() — предполагает, что calculation_details у Portal
-   хранит словарь вида {..., "portal_total_with_ratio": ..., ...}
-   (как возвращает calculate_beams/calculate_portals), а у Glukhar —
-   словарь вида result[name] из calculate_glukhar (с ключами
-   "price_with_ratio", "ИТОГО" и т.д.). Если реальные ключи, под которыми
-   вы сохраняете calculation_details, называются иначе — поправьте список
-   PORTAL_PRICE_KEYS / GLUKHAR_PRICE_KEYS.
+1. get_product_price() — рассчитывает на то, что calculation_details и у
+   Portal, и у Glukhar имеет единую форму (после унификации
+   calculate_portals/calculate_glukhar в calculate/services.py):
+   {"type":, "amount":, "materials":, "labor":, "total":, "ratio":,
+   "total_with_ratio":}. Если ключи называются иначе — поправьте
+   PRICE_KEYS.
 
 2. get_portal_image_path() / get_glukhar_image_path() — сейчас картинка
    подбирается по названию схемы (Scheme.name) / типа дерева (для
@@ -99,10 +98,10 @@ HARDWARE_SIDE_MAP = {
 GLASS_TYPE_TEXT = "40мм закалённый"
 
 # НАСТРОЙКА: под какими ключами в calculation_details лежит финальная
-# цена изделия (с учётом коэффициента). Проверяются по порядку, первое
-# найденное значение используется.
-PORTAL_PRICE_KEYS = ("portal_total_with_ratio", "portal_total")
-GLUKHAR_PRICE_KEYS = ("price_with_ratio",)  # запасной вариант ниже, через "ИТОГО"
+# цена изделия. После унификации calculate_portals/calculate_glukhar
+# (см. calculate/services.py) оба типа изделий отдают одинаковые
+# ключи "total_with_ratio" / "total", поэтому список общий для обоих.
+PRICE_KEYS = ("total_with_ratio", "total")
 
 FONT_NAME = "Times New Roman"
 
@@ -148,31 +147,18 @@ def _fmt_area(value) -> str:
 
 def get_product_price(product) -> Decimal:
     """
-    Достаёт итоговую (с коэффициентом) стоимость ОДНОЙ штуки/партии изделия
-    из уже посчитанного product.calculation_details.
-
-    Поддерживает и форму, которую возвращает calculate_beams (для Portal),
-    и форму result[name] из calculate_glukhar (для Glukhar).
+    Достаёт итоговую (с коэффициентом) стоимость партии изделия из уже
+    посчитанного product.calculation_details. Portal и Glukhar теперь
+    отдают одинаковую по форме структуру (type/amount/materials/labor/
+    total/ratio/total_with_ratio), поэтому обработка общая для обоих.
     """
     details = getattr(product, "calculation_details", None) or {}
     if not isinstance(details, dict):
         return Decimal("0")
 
-    for key in PORTAL_PRICE_KEYS:
+    for key in PRICE_KEYS:
         if key in details:
             return _to_decimal(details[key])
-
-    for key in GLUKHAR_PRICE_KEYS:
-        if key in details:
-            return _to_decimal(details[key])
-
-    itogo = details.get("ИТОГО")
-
-    if isinstance(itogo, dict) and "N_price" in itogo:
-        return _to_decimal(itogo["N_price"])
-
-    if itogo is not None and not isinstance(itogo, dict):
-        return _to_decimal(itogo)
 
     return Decimal("0")
 
@@ -273,9 +259,7 @@ def _safe_image_stream(image_path: str) -> io.BytesIO:
         return buf
 
 
-def _add_product_block(
-    doc: Document, image_path: str, spec_rows: Iterable[tuple[str, str]]
-) -> None:
+def _add_product_block(doc: Document, image_path: str, spec_rows: Iterable[tuple[str, str]]) -> None:
     """
     Таблица 'картинка | подпись | значение' — картинка изделия слева
     (объединена по вертикали на все строки), справа характеристики.
@@ -336,9 +320,7 @@ def _add_portal_section(doc: Document, portal, index: int) -> Decimal:
     width = portal.width
     height = portal.height
     amount = portal.amount
-    area_total = (
-        _to_decimal(width) * _to_decimal(height) / Decimal("1000000")
-    ) * _to_decimal(amount)
+    area_total = (_to_decimal(width) * _to_decimal(height) / Decimal("1000000")) * _to_decimal(amount)
     price = get_product_price(portal)
 
     spec_rows = [
@@ -369,9 +351,7 @@ def _add_glukhar_section(doc: Document, glukhar, index: int) -> Decimal:
     width = glukhar.width
     height = glukhar.height
     amount = glukhar.amount
-    area_total = (
-        _to_decimal(width) * _to_decimal(height) / Decimal("1000000")
-    ) * _to_decimal(amount)
+    area_total = (_to_decimal(width) * _to_decimal(height) / Decimal("1000000")) * _to_decimal(amount)
     price = get_product_price(glukhar)
 
     spec_rows = [
@@ -548,18 +528,14 @@ def build_commercial_proposal(
 
     _add_document_header(doc, company_name, inn, ogrn, proposal_date, shipment_term)
 
-    portals = list(
-        order.portal_set.select_related(
-            "scheme", "wood_type", "hardware_type", "color_type"
-        ).all()
-    )
+    portals = list(order.portal_set.select_related("scheme", "wood_type", "hardware_type", "color_type").all())
     glukhars = list(order.glukhar_set.select_related("wood_type", "color_type").all())
 
     items_total = Decimal("0")
     items_count = 0
 
     for i, portal in enumerate(portals):
-        items_total += get_product_price(portal)
+        items_total += get_product_price(portal) 
         items_count += portal.amount
         _add_portal_section(doc, portal, i)
 
@@ -576,9 +552,7 @@ def build_commercial_proposal(
     # готовое order.total_sum), раскомментируйте строку ниже и
     # примените вашу логику скидки (order.discount).
     # grand_total = items_total + installation + delivery + unloading
-    grand_total = _to_decimal(order.total_sum) or (
-        items_total + installation + delivery + unloading
-    )
+    grand_total = _to_decimal(order.total_sum) or (items_total + installation + delivery + unloading)
 
     _add_totals_block(
         doc,

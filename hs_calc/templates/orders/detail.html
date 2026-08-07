@@ -49,12 +49,12 @@
             <div class="tab-content" id="portalSubTabsContent">
                 <div class="tab-pane fade show active" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
                     {% for product in portals %}
-                        {% if product.calculation_details.workpiece %}
+                        {% if product.calculation_details.materials %}
                             <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
                                 Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
                                 <span class="fs-6 fw-normal text-muted product-area-display"></span>
                             </h4>
-                            {% for scheme_name, scheme_data in product.calculation_details.workpiece.items %}
+                            {% for scheme_name, scheme_data in product.calculation_details.materials.items %}
                                 <div class="card mb-4 shadow-sm border-secondary">
                                     <div class="card-header bg-primary text-white">
                                         <h5 class="mb-0">Схема {{ scheme_name }} (Материалы)</h5>
@@ -62,7 +62,7 @@
                                     <div class="card-body p-0">
                                         <div class="table-responsive">
                                             <table class="table table-bordered table-hover mb-0 align-middle main-table export-table" 
-                                                   data-sheet-name="Портал_{{ product.calculation_details.N }}_{{ scheme_name }}">
+                                                   data-sheet-name="Портал_{{ product.calculation_details.amount }}_{{ scheme_name }}">
                                                 <thead class="table-dark">
                                                     <tr>
                                                         <th>ВИД</th>
@@ -114,19 +114,19 @@
 
                 <div class="tab-pane fade" id="portal-labor-pane" role="tabpanel" aria-labelledby="portal-labor-tab">
                     {% for product in portals %}
-                        {% if product.calculation_details.workpiece and product.calculation_details.work_data %}
+                        {% if product.calculation_details.materials and product.calculation_details.labor %}
                             <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
                                 Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
                                 <span class="fs-6 fw-normal text-muted product-area-display"></span>
                             </h4>
-                            {% for labor_scheme, labor_details in product.calculation_details.work_data.items %}
+                            {% for labor_scheme, labor_details in product.calculation_details.labor.items %}
                             <div class="card mb-5 shadow-sm border-info">
                                 <div class="card-header bg-info text-dark">
                                     <h5 class="mb-0">Схема {{ labor_scheme }} (Трудозатраты)</h5>
                                 </div>
                                 <div class="card-body p-0">
                                     <table class="table table-striped table-bordered mb-0 labor-table export-table" 
-                                           data-sheet-name="Труд_П{{ product.calculation_details.N }}_{{ labor_scheme }}">
+                                           data-sheet-name="Труд_П{{ product.calculation_details.amount }}_{{ labor_scheme }}">
                                         <thead class="table-dark">
                                             <tr>
                                                 <th>Деталь</th>
@@ -136,10 +136,10 @@
                                         </thead>
                                         <tbody>
                                             {% for detail, costs in labor_details.items %}
-                                            <tr class="labor-row" data-stolyar="{{ costs.столяр }}" data-malyar="{{ costs.маляр }}">
+                                            <tr class="labor-row" data-stolyar="{{ costs.carpenter }}" data-malyar="{{ costs.painter }}">
                                                 <td>{{ detail }}</td>
-                                                <td>{{ costs.столяр }}</td>
-                                                <td>{{ costs.маляр }}</td>
+                                                <td>{{ costs.carpenter }}</td>
+                                                <td>{{ costs.painter }}</td>
                                             </tr>
                                             {% endfor %}
                                             <tr class="table-secondary fw-bold">
@@ -169,7 +169,7 @@
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover mb-0 align-middle export-table" data-sheet-name="Глухарь_{{ product.calculation_details.N|default:forloop.counter }}">
+                            <table class="table table-bordered table-hover mb-0 align-middle export-table" data-sheet-name="Глухарь_{{ product.calculation_details.amount|default:forloop.counter }}">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Наименование</th>
@@ -180,8 +180,7 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for key, val in product.calculation_details.items %}
-                                        {% if key != 'type' and key != 'N' and key != 'ИТОГО' and key != 'price_with_ratio' %}
+                                    {% for key, val in product.calculation_details.materials.items %}
                                         <tr>
                                             <td>{{ key }}</td>
                                             <td>{{ val.price }}</td>
@@ -192,14 +191,22 @@
                                                     {{ val.length }}
                                                 {% endif %}
                                             </td>
-                                            <td>{{ val.N_amount }}</td>
-                                            <td>{{ val.N_price }}</td>
+                                            <td>{{ val.total_amount }}</td>
+                                            <td>{{ val.total_price }}</td>
                                         </tr>
-                                        {% endif %}
+                                    {% endfor %}
+                                    {% for key, val in product.calculation_details.labor.items %}
+                                        <tr>
+                                            <td>{{ key }}</td>
+                                            <td>{{ val.price }}</td>
+                                            <td>{{ val.length }}</td>
+                                            <td>{{ val.total_amount }}</td>
+                                            <td>{{ val.total_price }}</td>
+                                        </tr>
                                     {% endfor %}
                                     <tr class="table-secondary fw-bold">
                                         <td colspan="4" class="text-end pe-3">ИТОГО за изделие:</td>
-                                        <td>{{ product.calculation_details.ИТОГО.N_price }}</td>
+                                        <td>{{ product.calculation_details.total }}</td>
                                     </tr>
                                 </tbody>
                             </table>

@@ -78,7 +78,7 @@
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-primary mb-2 pt-2 border-top">🪵 Спецификация</h6>
+                        <h6 class="fw-bold text-primary mb-2 pt-2 border-top">Спецификация</h6>
                         <div class="mb-2">
                             <label class="form-label small mb-1 text-muted">Тип дерева</label>
                             <select class="form-select form-select-sm p-wood" required>
@@ -120,7 +120,7 @@
                     </div>
 
                     <div class="col-md-7">
-                        <h6 class="fw-bold text-primary mb-2">🪟 Схема открывания</h6>
+                        <h6 class="fw-bold text-primary mb-2">Схема открывания</h6>
                         <div class="p-schemes-container row g-2"></div>
                     </div>
                 </div>
@@ -361,14 +361,14 @@
 
         function displayResults(data) {
             let html = '<h3 class="mb-3 border-bottom pb-2 mt-5">📊 Результаты пакетного расчета</h3>';
-            baseTotalPrice = data["ИТОГО_С_КОЭФФИЦИЕНТОМ"] || 0;
+            baseTotalPrice = parseFloat(data["total_with_ratio"]) || 0;
 
             let cardsHtml = '<div class="row g-3 mb-4">';
             
             // Итерируемся по отправленному массиву, так как структура ответа - это словарь с именами
             lastPayload.portals.forEach((p, index) => {
                 const portalResult = data[p.name] || {};
-                const portalTotal = portalResult.portal_total_with_ratio || 0;
+                const portalTotal = portalResult.total_with_ratio || 0;
                 const schemeRatio = portalResult.scheme_ratio || 1;
                 const currentArea = (p.width * p.height / 1000000) * p.amount;
 
@@ -456,8 +456,6 @@
             const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
-            // baseTotalPrice уже содержит сумму с учетом индивидуального
-            // коэффициента наценки для каждого портала (по его схеме).
             const finalTotal = baseTotalPrice + (totalArea * installRate) + delivery + unloading - discount;
             lastGrandTotal = finalTotal;
             document.getElementById('dynamicGrandTotal').textContent = `Итого с учетом доп. услуг: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;

@@ -142,7 +142,7 @@
                             </div>
                         </div>
 
-                        <h6 class="fw-bold text-primary mb-2 pt-2 border-top">🪵 Спецификация</h6>
+                        <h6 class="fw-bold text-primary mb-2 pt-2 border-top">Спецификация</h6>
                         <div class="mb-2">
                             <label class="form-label small mb-1 text-muted">Тип дерева</label>
                             <select class="form-select form-select-sm p-wood" required>
@@ -535,17 +535,16 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function renderResults() {
-        const portalTotalWithRatio = portalCalcResult ? (parseFloat(portalCalcResult['ИТОГО_С_КОЭФФИЦИЕНТОМ']) || 0) : 0;
-        const glukharTotalWithRatio = glukharCalcResult ? (parseFloat(glukharCalcResult['ИТОГО_С_КОЭФФИЦИЕНТОМ']) || 0) : 0;
+        const portalTotalWithRatio = portalCalcResult ? (parseFloat(portalCalcResult['total_with_ratio']) || 0) : 0;
+        const glukharTotalWithRatio = glukharCalcResult ? (parseFloat(glukharCalcResult['total_with_ratio']) || 0) : 0;
 
         let html = '<h3 class="mb-3 border-bottom pb-2">📊 Результаты расчета</h3>';
 
         if (portalsPayload.length) {
             html += '<h5 class="mt-3">Порталы</h5><div class="row g-3 mb-3">';
             portalsPayload.forEach((p, index) => {
-                const portalResult = portalCalcResult[p.name] || {};
-                const total = portalResult.portal_total_with_ratio || 0;
-                const schemeRatio = portalResult.scheme_ratio || 1;
+                const total = portalCalcResult[p.name].total_with_ratio;
+                const area = (p.height * p.width / 1_000_000 * p.amount).toFixed(2);;
                 html += `<div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm border-secondary">
                         <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between">
@@ -556,7 +555,8 @@ document.addEventListener('DOMContentLoaded', function () {
                                 <tbody>
                                     <tr><td class="text-start ps-2 small">Схема / Дерево</td><td class="small">${p.scheme} / ${p.wood_type}</td></tr>
                                     <tr><td class="text-start ps-2 small">Размер</td><td class="small">${p.width} x ${p.height} мм</td></tr>
-                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${total.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб</td></tr>
+                                    <tr><td class="text-start ps-2 small">Общая площадь</td><td class="small">${area} м²</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${total} руб</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -569,18 +569,19 @@ document.addEventListener('DOMContentLoaded', function () {
         if (glukharsPayload.length) {
             html += '<h5 class="mt-3">Глухари</h5><div class="row g-3 mb-3">';
             glukharsPayload.forEach((g, index) => {
-                const itog = (glukharCalcResult[g.name] || {})['ИТОГО'] || {};
-                const nPrice = itog.N_price || 0;
+                const total = glukharCalcResult[g.name].total_with_ratio;
+                const area = (g.height * g.width / 1_000_000 * g.amount).toFixed(2);;
                 html += `<div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm border-secondary">
-                        <div class="card-header bg-light fw-bold d-flex justify-content-between">
+                        <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between">
                             <span>Глухарь #${index + 1}</span><span class="badge bg-primary">x${g.amount} шт.</span>
                         </div>
                         <div class="card-body p-0">
                             <table class="table table-sm table-bordered mb-0 text-center align-middle">
                                 <tbody>
                                     <tr><td class="text-start ps-2 small">Размер</td><td class="small">${g.width} x ${g.height} мм</td></tr>
-                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${nPrice.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб</td></tr>
+                                    <tr><td class="text-start ps-2 small">Общая площадь</td><td class="small">${area} м²</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${total} руб</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -593,7 +594,7 @@ document.addEventListener('DOMContentLoaded', function () {
         html += `
         <div class="card mb-4 bg-light shadow-sm">
             <div class="card-body">
-                <h5 class="card-title fw-bold mb-3">🚚 Дополнительные параметры заказа</h5>
+                <h5 class="card-title fw-bold mb-3">Дополнительные параметры заказа</h5>
                 <div class="row g-3">
                     <div class="col-lg col-md-4">
                         <label class="form-label fw-bold small">Монтаж (руб/м²)</label>

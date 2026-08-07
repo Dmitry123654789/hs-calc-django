@@ -46,6 +46,15 @@ BEAM_LIST_FOR_WORK = [
     "14С",
 ]
 
+# Единые (для порталов и глухарей) названия полей в JSON для покрасочных
+# материалов, привязанные к типу покраски ("RAL" / "Лесс" — сами значения
+# приходят из БД/формы и не переводятся, чтобы не сломать сопоставление
+# с Color.name).
+COLOR_FIELD_NAMES = {
+    "RAL": ("ral_enamel", "ral_primer"),
+    "Лесс": ("glaze_varnish", "glaze_primer"),
+}
+
 
 def to_decimal(value, default="0") -> Decimal:
     if isinstance(value, Decimal):
@@ -652,17 +661,14 @@ def calculate_color(color: str, scheme_name: str, portal_width, portal_height) -
         2,
     )
 
-    name_dict = {
-        "RAL": ["RAL-эмаль", "RAL-грунт"],
-        "Лесс": ["Лесс-лак", "Лесс-грунт"],
-    }
+    varnish_key, primer_key = COLOR_FIELD_NAMES[color]
 
     return {
-        name_dict[color][0]: {
+        varnish_key: {
             "price": money(first_price_color * first_color_amount),
             "w_list": {"-": first_color_amount},
         },
-        name_dict[color][1]: {
+        primer_key: {
             "price": money(second_price_color * second_color_amount),
             "w_list": {"-": second_color_amount},
         },
@@ -740,7 +746,9 @@ def calculate_glass(
 
 def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
     result = {
-        scheme: {beam: {"столяр": ZERO, "маляр": ZERO} for beam in BEAM_LIST_FOR_WORK}
+        scheme: {
+            beam: {"carpenter": ZERO, "painter": ZERO} for beam in BEAM_LIST_FOR_WORK
+        }
         for scheme in workpiece
     }
 
@@ -767,8 +775,8 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
                 common_length = mul_dict(has_w_list) + mul_dict(has_h_list)
 
                 result[scheme][beam] = {
-                    "столяр": dec_ceil(common_length * beam_price_carpenter / THOUSAND),
-                    "маляр": dec_ceil(common_length * beam_price_painter / THOUSAND),
+                    "carpenter": dec_ceil(common_length * beam_price_carpenter / THOUSAND),
+                    "painter": dec_ceil(common_length * beam_price_painter / THOUSAND),
                 }
                 continue
 
@@ -776,8 +784,8 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
                 mul_w = mul_dict(has_w_list)
 
                 result[scheme][beam] = {
-                    "столяр": dec_ceil(mul_w * beam_price_carpenter / THOUSAND),
-                    "маляр": dec_ceil(mul_w * beam_price_painter / THOUSAND),
+                    "carpenter": dec_ceil(mul_w * beam_price_carpenter / THOUSAND),
+                    "painter": dec_ceil(mul_w * beam_price_painter / THOUSAND),
                 }
                 continue
 
@@ -785,8 +793,8 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
                 mul_h = mul_dict(has_h_list)
 
                 result[scheme][beam] = {
-                    "столяр": dec_ceil(mul_h * beam_price_carpenter / THOUSAND),
-                    "маляр": dec_ceil(mul_h * beam_price_painter / THOUSAND),
+                    "carpenter": dec_ceil(mul_h * beam_price_carpenter / THOUSAND),
+                    "painter": dec_ceil(mul_h * beam_price_painter / THOUSAND),
                 }
 
         door_amount = get_door_amount(scheme)
@@ -794,19 +802,19 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
         stvorki = door_amount + sash_amount
         area = get_door_area(portal_width, portal_height, scheme)
 
-        result[scheme]["Створка"] = {
-            "столяр": dec_ceil(area * get_salary("door", "carpenter")),
-            "маляр": dec_ceil(area * get_salary("door", "painter")),
+        result[scheme]["sash"] = {
+            "carpenter": dec_ceil(area * get_salary("door", "carpenter")),
+            "painter": dec_ceil(area * get_salary("door", "painter")),
         }
 
-        result[scheme]["Замок"] = {
-            "столяр": dec_ceil(to_decimal(door_amount) * get_salary("lock", "carpenter")),
-            "маляр": dec_ceil(to_decimal(door_amount) * get_salary("lock", "painter")),
+        result[scheme]["lock"] = {
+            "carpenter": dec_ceil(to_decimal(door_amount) * get_salary("lock", "carpenter")),
+            "painter": dec_ceil(to_decimal(door_amount) * get_salary("lock", "painter")),
         }
 
-        result[scheme]["Упаковка"] = {
-            "столяр": dec_ceil(to_decimal(stvorki) * get_salary("package", "carpenter")),
-            "маляр": dec_ceil(to_decimal(stvorki) * get_salary("package", "painter")),
+        result[scheme]["packaging"] = {
+            "carpenter": dec_ceil(to_decimal(stvorki) * get_salary("package", "carpenter")),
+            "painter": dec_ceil(to_decimal(stvorki) * get_salary("package", "painter")),
         }
 
     return result
@@ -814,20 +822,20 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
 
 def summ_work(data: dict) -> dict:
     result = {
-        "столяр": ZERO,
-        "маляр": ZERO,
+        "carpenter": ZERO,
+        "painter": ZERO,
     }
 
     for beam_data in data.values():
         if not isinstance(beam_data, dict):
             continue
 
-        result["столяр"] += to_decimal(beam_data.get("столяр", ZERO))
-        result["маляр"] += to_decimal(beam_data.get("маляр", ZERO))
+        result["carpenter"] += to_decimal(beam_data.get("carpenter", ZERO))
+        result["painter"] += to_decimal(beam_data.get("painter", ZERO))
 
     return {
-        "столяр": dec_ceil(result["столяр"]),
-        "маляр": dec_ceil(result["маляр"]),
+        "carpenter": dec_ceil(result["carpenter"]),
+        "painter": dec_ceil(result["painter"]),
     }
 
 
@@ -940,22 +948,17 @@ def calculate_beams(
     workpiece[scheme]["ЮП-968"] = get_rails_price(width, scheme, "ЮП-968")
     workpiece[scheme]["ЮП-969"] = get_rails_price(width, scheme, "ЮП-969")
 
-    workpiece[scheme]["Фурнитура"] = calculate_hardware(scheme, hardware)
-
-    name_dict = {
-        "RAL": ["RAL-эмаль", "RAL-грунт"],
-        "Лесс": ["Лесс-лак", "Лесс-грунт"],
-    }
+    workpiece[scheme]["hardware"] = calculate_hardware(scheme, hardware)
 
     color_data = calculate_color(color, scheme, width, height)
 
-    for color_item_name in name_dict.get(color, []):
+    for color_item_name in COLOR_FIELD_NAMES.get(color, ()):
         workpiece[scheme][color_item_name] = color_data[color_item_name]
 
     glass_data = calculate_glass(scheme, glazing, width, height)
 
-    workpiece[scheme]["Стеклопакет створка"] = glass_data["doors"]
-    workpiece[scheme]["Стеклопакет глухарь"] = glass_data["sashes"]
+    workpiece[scheme]["glass_doors"] = glass_data["doors"]
+    workpiece[scheme]["glass_sashes"] = glass_data["sashes"]
 
     for beam_name in target_beams:
         item = workpiece[scheme].get(beam_name)
@@ -970,13 +973,13 @@ def calculate_beams(
 
     work_result = summ_work(calculated_work)
 
-    workpiece[scheme]["Работа столяр"] = {
-        "price": work_result["столяр"],
+    workpiece[scheme]["labor_carpenter"] = {
+        "price": work_result["carpenter"],
         "w_list": {"-": "-"},
     }
 
-    workpiece[scheme]["Работа маляр"] = {
-        "price": work_result["маляр"],
+    workpiece[scheme]["labor_painter"] = {
+        "price": work_result["painter"],
         "w_list": {"-": "-"},
     }
 
@@ -1019,20 +1022,20 @@ def calculate_portals(portals: list) -> dict:
         ) = calculate_beams(**portal)
 
         result[portal["name"]] = {
-            "workpiece": workpiece,
-            "work_data": work_data,
-            "portal_total": portal_total,
-            "scheme_ratio": scheme_ratio,
-            "portal_total_with_ratio": portal_total_with_ratio,
             "type": "portal",
-            "N": portal.get("amount"),
+            "amount": portal.get("amount"),
+            "materials": workpiece,
+            "labor": work_data,
+            "total": portal_total,
+            "ratio": scheme_ratio,
+            "total_with_ratio": portal_total_with_ratio,
         }
 
         total_price += to_decimal(portal_total)
         total_price_with_ratio += to_decimal(portal_total_with_ratio)
 
-    result["ИТОГО"] = money(total_price)
-    result["ИТОГО_С_КОЭФФИЦИЕНТОМ"] = money(total_price_with_ratio)
+    result["total"] = money(total_price)
+    result["total_with_ratio"] = money(total_price_with_ratio)
 
     return result
 
@@ -1050,22 +1053,22 @@ def calculate_glukhar_color(color: str, width, height, n_amount) -> dict:
     varnish_price = dec_ceil(varnish_amount * price_varnish)
     grunt_price = dec_ceil(grunt_amount * price_grunt)
 
-    first_color_name = "RAL-эмаль" if color == "RAL" else "Лесс-лак"
+    varnish_key, primer_key = COLOR_FIELD_NAMES[color]
 
     return {
-        first_color_name: {
+        varnish_key: {
             "price": varnish_price,
             "length": "-",
             "amount": varnish_amount,
-            "N_amount": dec_round(varnish_amount * n_amount_dec, 2),
-            "N_price": money(varnish_price * n_amount_dec),
+            "total_amount": dec_round(varnish_amount * n_amount_dec, 2),
+            "total_price": money(varnish_price * n_amount_dec),
         },
-        f"{color}-грунт": {
+        primer_key: {
             "price": grunt_price,
             "length": "-",
             "amount": grunt_amount,
-            "N_amount": dec_round(grunt_amount * n_amount_dec, 2),
-            "N_price": money(grunt_price * n_amount_dec),
+            "total_amount": dec_round(grunt_amount * n_amount_dec, 2),
+            "total_price": money(grunt_price * n_amount_dec),
         },
     }
 
@@ -1098,18 +1101,18 @@ def calculate_glukhar_glass(width, height, amount, is_not_rectangle=False) -> di
             "h": as_number(glukhar_height),
         },
         "amount": 1,
-        "N_amount": amount_dec,
-        "N_price": money(price_glass * amount_dec),
+        "total_amount": amount_dec,
+        "total_price": money(price_glass * amount_dec),
     }
 
 
-def get_all_price(result: dict) -> Decimal:
+def get_all_price(items: dict) -> Decimal:
+    """Суммирует цены по "чистому" словарю строк материалов/работ
+    (без служебных полей вроде type/amount/total — им тут не место,
+    см. calculate_glukhar, где materials и labor собираются отдельно)."""
     price = ZERO
 
-    for key, value in result.items():
-        if key in ("N", "type", "ИТОГО"):
-            continue
-
+    for value in items.values():
         if isinstance(value, dict) and "price" in value:
             price += to_decimal(value["price"])
         elif isinstance(value, (int, float, Decimal)):
@@ -1118,16 +1121,15 @@ def get_all_price(result: dict) -> Decimal:
     return price
 
 
-def calculate_glukhar(glukhar_data: list, ratio="1") -> dict:
+def calculate_glukhar(glukhar_data: list, ratio) -> dict:
     result = {}
     total_price = ZERO
-    total_price_with_ratio = ZERO  # Добавляем переменную для общей суммы с коэффициентом
+    total_price_with_ratio = ZERO
 
     ratio_dec = to_decimal(ratio)
 
     for glukhar in glukhar_data:
         name = glukhar["name"]
-        result[name] = {}
 
         width = glukhar["width"]
         height = glukhar["height"]
@@ -1143,69 +1145,66 @@ def calculate_glukhar(glukhar_data: list, ratio="1") -> dict:
 
         glukhar_price = dec_ceil(get_price_glukhar(material) * perimeter)
 
-        result[name]["N"] = amount
-
-        result[name][f"Брус ({material})"] = {
-            "price": glukhar_price,
-            "length": 6000,
-            "amount": bars,
-            "N_amount": amount_dec * to_decimal(bars),
-            "N_price": money(glukhar_price * amount_dec),
+        materials = {
+            f"beam_{material}".lower(): {
+                "price": glukhar_price,
+                "length": 6000,
+                "amount": bars,
+                "total_amount": amount_dec * to_decimal(bars),
+                "total_price": money(glukhar_price * amount_dec),
+            },
         }
 
-        result[name].update(calculate_glukhar_color(color, width, height, amount))
+        materials.update(calculate_glukhar_color(color, width, height, amount))
 
-        glass_info = calculate_glukhar_glass(
+        materials["glass"] = calculate_glukhar_glass(
             width,
             height,
             amount,
             not_rectangle,
         )
 
-        result[name]["Стеклопакет"] = glass_info
-
         area = to_decimal(width) * to_decimal(height) / MILLION
 
         carpenter_salary = dec_ceil(area * get_salary("door", "carpenter"))
         painter_salary = dec_ceil(area * get_salary("door", "painter"))
 
-        result[name]["Работа столяра"] = {
-            "price": carpenter_salary,
-            "length": "-",
-            "amount": 1,
-            "N_amount": amount_dec,
-            "N_price": money(carpenter_salary * amount_dec),
+        labor = {
+            "carpenter": {
+                "price": carpenter_salary,
+                "length": "-",
+                "amount": 1,
+                "total_amount": amount_dec,
+                "total_price": money(carpenter_salary * amount_dec),
+            },
+            "painter": {
+                "price": painter_salary,
+                "length": "-",
+                "amount": 1,
+                "total_amount": amount_dec,
+                "total_price": money(painter_salary * amount_dec),
+            },
         }
 
-        result[name]["Работа маляра"] = {
-            "price": painter_salary,
-            "length": "-",
-            "amount": 1,
-            "N_amount": amount_dec,
-            "N_price": money(painter_salary * amount_dec),
+        item_total = get_all_price(materials) + get_all_price(labor)
+        item_total_amount = money(item_total * amount_dec)
+        item_total_with_ratio = money(item_total_amount * ratio_dec)
+
+        result[name] = {
+            "type": "glukhar",
+            "amount": amount,
+            "materials": materials,
+            "labor": labor,
+            "total": item_total_amount,
+            "ratio": ratio_dec,
+            "total_with_ratio": item_total_with_ratio,
         }
 
-        item_total = get_all_price(result[name])
-        n_price_total = money(item_total * amount_dec)
+        total_price += item_total_amount
+        total_price_with_ratio += item_total_with_ratio
 
-        result[name]["ИТОГО"] = {
-            "price": item_total,
-            "length": "-",
-            "amount": 1,
-            "N_amount": amount_dec,
-            "N_price": n_price_total,
-        }
-
-        result[name]["type"] = "glukhar"
-
-        price_with_ratio = money(n_price_total * ratio_dec)
-        result[name]["price_with_ratio"] = price_with_ratio
-
-        total_price += n_price_total
-        total_price_with_ratio += price_with_ratio
-
-    result["ИТОГО"] = money(total_price)
-    result["ИТОГО_С_КОЭФФИЦИЕНТОМ"] = money(total_price_with_ratio)
+    result["total"] = money(total_price)
+    result["total_with_ratio"] = money(total_price_with_ratio)
     result["ratio"] = as_number(ratio_dec)
 
     return result

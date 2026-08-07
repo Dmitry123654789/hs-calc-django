@@ -124,7 +124,7 @@
 
         const isAdmin = {{ is_admin|yesno:"true,false" }};
         const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
-        const profitRatioFromContext = parseFloat('{{ profit_ratio|default:1.0 }}') || 1.0;
+        const profitRatioFromContext = parseFloat('{{ profit_ratio }}') || 1.0;
 
         // --- ФУНКЦИЯ КРАСИВЫХ АЛЕРТОВ ---
         function showAlert(message, type = 'danger') {
@@ -278,7 +278,7 @@
             .then(data => {
                 if (data.error) throw new Error(data.error);
                 lastCalculationResult = data;
-                displayResults(data, originalDimensions);
+                displayResults(payload.glukhars, lastCalculationResult);
             })
             .catch(error => {
                 resultContainer.innerHTML = '';
@@ -287,71 +287,30 @@
         });
 
         // 4. Отображение результатов и новых полей
-        function displayResults(data, sizesArray) {
-            if (data.error) {
-                showAlert(data.error);
-                return;
-            }
-
-            const glukharKeys = Object.keys(data).filter(k => k.startsWith('glukhar')).sort((a,b) => parseInt(a.replace('glukhar','')) - parseInt(b.replace('glukhar','')));
-            if (glukharKeys.length === 0) return;
-
-            let html = '<h3 class="mb-3 border-bottom pb-2">📊 Результаты расчета</h3><div class="row">';
-            
-            // Считаем базовую стоимость из ответа сервера
-            baseTotalPrice = 0;
-            for (let idx = 0; idx < glukharKeys.length; idx++) {
-                const key = glukharKeys[idx];
-                const glukhar = data[key];
-                const N_amount = glukhar['N'];
-                
-                let sizeExtra = '';
-                if (sizesArray[idx] && sizesArray[idx].width) {
-                    const w = sizesArray[idx].width, h = sizesArray[idx].height;
-                    sizeExtra = ` (${w} x ${h} мм, ${(w*h/1000000).toFixed(1)} м²)`;
-                }
-
-                const materialKey = Object.keys(glukhar).find(k => k.startsWith('Брус'));
-                const materialFullName = materialKey || 'Брус';
-                const color = glukhar['RAL-эмаль'] ? 'RAL' : (glukhar['Лесс-лак'] ? 'Лесс' : 'RAL');
-
-                const rowOrder = [
-                    { display: 'ИТОГО', keyFunc: () => 'ИТОГО', isSimpleNumber: false }
-                ];
-
-                html += `<div class="col-12 mb-4">
-                    <div class="card h-100 border-primary shadow-sm">
-                        <div class="card-header bg-primary text-white fw-bold">Глухарь ${idx+1}${sizeExtra}</div>
-                        <div class="card-body p-0 table-responsive">
-                            <table class="table table-striped table-bordered table-sm mb-0">
-                                <thead class="table-light"><tr>
-                                </tr></thead><tbody>`;
-                
-                for (let item of rowOrder) {
-                    const rowKey = item.keyFunc();
-                    const rowData = glukhar[rowKey];
-                    if (rowData === undefined) continue;
-
-                    if (typeof rowData === 'object' && rowData !== null) {
-                        let sizeText = '—';
-                        if (rowData.length && typeof rowData.length === 'object') sizeText = `${rowData.length.w} x ${rowData.length.h}`;
-                        else if (rowData.length !== undefined && rowData.length !== '-') sizeText = rowData.length;
-                        
-                        let priceStr = typeof rowData.price === 'number' ? rowData.price.toFixed(2) : rowData.price;
-                        let nPriceStr = typeof rowData.N_price === 'number' ? rowData.N_price.toFixed(2) : rowData.N_price;
-                        
-                        let rowClass = '';
-                        if (item.display === 'ИТОГО') {
-                            rowClass = 'class="table-success fw-bold"';
-                            baseTotalPrice += parseFloat(rowData.N_price) || 0;
-                        }
-
-                        html += `<tr ${rowClass}><td>${item.display}</td><td>${nPriceStr}</td></tr>`;
-                    }
-                }
-                html += `</tbody></table></div></div></div>`;
-            }
-            html += '</div>';
+        function displayResults(glukhars, CalculationResult) {
+            let html = '<h3 class="mb-3 border-bottom pb-2">📊 Результаты расчета</h3>';
+            html += '<h5 class="mt-3">Глухари</h5><div class="row g-3 mb-3">';
+            glukhars.forEach((g, index) => {
+                const total = CalculationResult[g.name].total_with_ratio;
+                const area = (g.height * g.width / 1_000_000 * g.amount).toFixed(2);;
+                html += `<div class="col-md-6 col-lg-4">
+                    <div class="card h-100 shadow-sm border-secondary">
+                        <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between">
+                            <span>Глухарь #${index + 1}</span><span class="badge bg-primary">x${g.amount} шт.</span>
+                        </div>
+                        <div class="card-body p-0">
+                            <table class="table table-sm table-bordered mb-0 text-center align-middle">
+                                <tbody>
+                                    <tr><td class="text-start ps-2 small">Размер</td><td class="small">${g.width} x ${g.height} мм</td></tr>
+                                    <tr><td class="text-start ps-2 small">Общая площадь</td><td class="small">${area} м²</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${total} руб</td></tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>`;
+            });
+            html += '</div>';            
             
             // Блок с дополнительными параметрами
             html += `
@@ -381,9 +340,9 @@
                         ${isAdmin ? '' : `<span id="dealerPercentageBlock" class="border-start ps-3"></span>`}
                     </div>
                 </div>
-            </div>`;
-            
-            html += `<div class="d-flex flex-wrap gap-2 mb-5">
+            </div>
+
+            <div class="d-flex flex-wrap gap-2 mb-5">
                 <button type="button" class="btn btn-primary ms-auto" id="saveOrderBtn">Сохранить заказ</button>
                 <button type="button" class="btn btn-outline-dark" id="downloadKpBtn" style="display: none;">
                     <i class="bi bi-file-earmark-word"></i> Скачать КП
@@ -446,7 +405,6 @@
             payload.installation = parseFloat(document.getElementById('installRate').value);
             payload.delivery = parseFloat(document.getElementById('deliveryCost').value);
             payload.unloading = parseFloat(document.getElementById('unloadingCost').value);
-            payload.profit_ratio = profitRatioFromContext;
             payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
             payload.order_total = lastGrandTotal;
             

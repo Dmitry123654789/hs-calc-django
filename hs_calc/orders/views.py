@@ -401,10 +401,11 @@ class GlukharOrderView(ManagerRequiredMixin, View):
         data = loads(request.body)
 
         glukhars = data.get("glukhars", [])
-        calc_result = calculate_glukhar(glukhars)
 
-        ratio_obj = ProfitRatio.objects.get(name="glukhar")
-        calc_result["profit_ratio"] = float(ratio_obj.ratio)
+        ratio = float(ProfitRatio.objects.get(name="glukhar").ratio)
+        calc_result = calculate_glukhar(glukhars, ratio)
+
+        calc_result["profit_ratio"] = ratio
 
         if not request.user.profile.is_director:
             calc_result["dealer_percentage"] = float(
