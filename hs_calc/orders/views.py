@@ -29,7 +29,21 @@ ORDER_STATUS_TRANSITIONS = {
     Order.Status.Ordered: {Order.Status.In_work, Order.Status.Cancelled},
     Order.Status.In_work: {Order.Status.Done, Order.Status.Cancelled},
 }
-
+REPLACE_DICT = {
+    "hardware": "Фурнитура",
+    "ral_enamel": "RAL-эмаль",
+    "ral_primer": "RAL-грунт",
+    "glass_doors": "Стеклопакет створка",
+    "glass_sashes": "Стеклопакет глухарь",
+    "sash": "Створка",
+    "lock": "Замок",
+    "packaging": "Упаковка",
+    "glass": "Стеклопакет",
+    "carpenter": "Столяр",
+    "painter": "Маляр",
+    "glaze_varnish": "Лесс-лак",
+    "glaze_primer": "Лесс-грунт",
+}
 
 def calculate_dealer_percentage(user):
     if user.profile.is_manager:
@@ -94,19 +108,7 @@ class OrderDetailView(BackURLMixin, ManagerRequiredMixin, DetailView):
             Decimal("1"),
             rounding=ROUND_HALF_UP,
         )
-        context["replace_dict"] = {
-            "hardware": "Фурнитура",
-            "ral_enamel": "RAL-эмаль",
-            "ral_primer": "RAL-грунт",
-            "glass_doors": "Стеклопакет створка",
-            "glass_sashes": "Стеклопакет глухарь",
-            "sash": "Створка",
-            "lock": "Замок",
-            "packaging": "Упаковка",
-            "glass": "Стеклопакет",
-            "carpenter": "Столяр",
-            "painter": "Маляр",
-        }
+        context["replace_dict"] = REPLACE_DICT
         return context
 
 
@@ -141,19 +143,7 @@ class OrderDetailMaterialsView(BackURLMixin, OnlyWorkerRequiredMixin, DetailView
         context["portals"] = self.object.portal_set.all()
         context["glukhars"] = self.object.glukhar_set.all()
         context["back_url"] = self.get_back_url()
-        context["replace_dict"] = {
-            "hardware": "Фурнитура",
-            "ral_enamel": "RAL-эмаль",
-            "ral_primer": "RAL-грунт",
-            "glass_doors": "Стеклопакет створка",
-            "glass_sashes": "Стеклопакет глухарь",
-            "sash": "Створка",
-            "lock": "Замок",
-            "packaging": "Упаковка",
-            "glass": "Стеклопакет",
-            "carpenter": "Столяр",
-            "painter": "Маляр",
-        }
+        context["replace_dict"] = REPLACE_DICT
         return context
 
 

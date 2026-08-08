@@ -50,9 +50,7 @@
                                     <div class="card-body p-0">
                                         <div class="table-responsive">
                                             <table class="table table-bordered table-hover mb-0 align-middle main-table export-table"
-                                                   data-sheet-name="Портал_{{ product.calculation_details.amount }}_{{ scheme_name }}"
-                                                   data-portal-n="{{ product.calculation_details.amount }}"
-                                                   data-scheme-name="{{ scheme_name }}">
+                                                   data-sheet-name="Портал_{{ scheme_name }}_{{ product.id }}">
                                                 <thead class="table-dark">
                                                     <tr>
                                                         <th>ВИД</th>
@@ -66,7 +64,7 @@
                                                         {% if detail_data and detail_data.price is not None %}
                                                             {% for size, count in detail_data.w_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
-                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-translated-name="{{ detail_name|get_or_self:replace_dict }}" data-detail-price="{{ detail_data.price }}">
                                                                     <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td>{{ size }}</td>
                                                                     <td>{{ count }}</td>
@@ -76,7 +74,7 @@
 
                                                             {% for size, count in detail_data.h_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
-                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-translated-name="{{ detail_name|get_or_self:replace_dict }}" data-detail-price="{{ detail_data.price }}">
                                                                     <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td>{{ size }}</td>
                                                                     <td>{{ count }}</td>
@@ -110,8 +108,7 @@
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-bordered table-hover mb-0 align-middle export-table"
-                                   data-sheet-name="Глухарь_{{ product.calculation_details.amount|default:forloop.counter }}"
-                                   data-glukhar-n="{{ product.calculation_details.amount|default:forloop.counter }}">
+                                   data-sheet-name="Глухарь_{{ product.id }}">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Наименование</th>
@@ -122,7 +119,13 @@
                                 <tbody>
                                     {% for key, val in product.calculation_details.materials.items %}
                                         <tr>
-                                            <td>{{ key|get_or_self:replace_dict }}</td>
+                                            <td>
+                                            {% if key|slice:":5" == "beam_" %}
+                                                Брус ({{ key|slice:"5:" }})
+                                            {% else %}
+                                                {{ key|get_or_self:replace_dict }}
+                                            {% endif %}
+                                            </td>
                                             <td>
                                                 {% if val.length.w %}
                                                     {{ val.length.w }} x {{ val.length.h }}
@@ -184,7 +187,7 @@
             }
         });
 
-        // Объединение повторяющихся ВИД через rowspan — как в detail.html
+        // Объединение повторяющихся ВИД через rowspan
         document.querySelectorAll(".main-table").forEach(function(table) {
             const rows = table.querySelectorAll("tbody tr.detail-row");
             let currentDetail = null;
@@ -219,7 +222,143 @@
     });
 
     document.getElementById("exportExcelBtn")?.addEventListener("click", function() {
-        alert("реализовать генерацию excel файла с помощью xlsx.full.min.js")
+
+        const tables = document.querySelectorAll(".export-table");
+        if (!tables.length) {
+            alert("Нет данных для экспорта.");
+            return;
+        }
+
+        const workbook = XLSX.utils.book_new();
+
+        tables.forEach(function(table) {
+            let sheetName = table.dataset.sheetName || "Лист";
+            // Очищаем запрещенные в Excel символы
+            sheetName = sheetName.replace(/[\\/?*\[\]:]/g, '').substring(0, 31);
+
+            // Заголовки
+            const thead = table.querySelector("thead");
+            let headers = [];
+            if (thead) {
+                const ths = thead.querySelectorAll("tr th");
+                ths.forEach(function(th) {
+                    let text = th.textContent.trim();
+                    if (text === "ВИД") text = "Наименование";
+                    else if (text === "РАЗМЕР, мм" || text === "Длина/Размер") text = "Размер";
+                    else if (text === "КОЛ-ВО") text = "Кол-во";
+                    headers.push(text);
+                });
+            } else {
+                headers = ["Наименование", "Размер", "Кол-во"];
+            }
+
+            const rows = table.querySelectorAll("tbody tr");
+            let isPortalTable = false;
+            rows.forEach(row => {
+                if (row.getAttribute("data-detail-name") !== null) {
+                    isPortalTable = true;
+                }
+            });
+
+            let rowsData = [];
+            let merges = [];
+
+            if (isPortalTable) {
+                const groups = new Map();
+                rows.forEach(row => {
+                    // ТЕПЕРЬ БЕРЕМ ПЕРЕВЕДЕННОЕ НАЗВАНИЕ
+                    const name = row.getAttribute("data-translated-name") || row.getAttribute("data-detail-name");
+                    if (!name) return;
+                    const cells = row.querySelectorAll("td");
+                    if (cells.length < 2) return;
+                    
+                    const size = cells[cells.length - 2].textContent.trim();
+                    const count = cells[cells.length - 1].textContent.trim();
+                    
+                    if (!groups.has(name)) {
+                        groups.set(name, []);
+                    }
+                    groups.get(name).push({ size, count });
+                });
+
+                let rowIndex = 0;
+                groups.forEach((items, name) => {
+                    const startRow = rowIndex;
+                    items.forEach((item, idx) => {
+                        if (idx === 0) {
+                            rowsData.push([name, item.size, item.count]);
+                        } else {
+                            rowsData.push(["", item.size, item.count]);
+                        }
+                        rowIndex++;
+                    });
+                    const endRow = rowIndex - 1;
+                    if (startRow < endRow) {
+                        merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } });
+                    }
+                });
+            } else {
+                rows.forEach(row => {
+                    const text = row.textContent.trim();
+                    if (text.includes("Работа маляра") || text.includes("Работа столяра")) return;
+                    const cells = row.querySelectorAll("td");
+                    if (cells.length >= 3) {
+                        const name = cells[0].textContent.trim();
+                        const size = cells[1].textContent.trim();
+                        const count = cells[2].textContent.trim();
+                        if (name) {
+                            rowsData.push([name, size, count]);
+                        }
+                    }
+                });
+            }
+
+            // Добавляем отступ и количество товара снизу таблицы
+            const quantity = table.dataset.portalN || table.dataset.glukharN || "1";
+            rowsData.push(["", "", ""]); // Пустая строка для отступа
+            rowsData.push(["Количество товара:", "", quantity]);
+
+            if (rowsData.length === 0) return;
+
+            const wsData = [headers, ...rowsData];
+            const ws = XLSX.utils.aoa_to_sheet(wsData);
+            
+            // Устанавливаем ширину первой колонки в 300 пикселей (wpx = width in pixels)
+            ws['!cols'] = [
+                { wch: 19 }, // A: Наименование
+                { wch: 19 }, // B: Размер
+                { wch: 19 }  // C: Кол-во
+            ];
+
+            if (merges.length) {
+                ws['!merges'] = merges.map(m => ({
+                    s: { r: m.s.r + 1, c: m.s.c }, 
+                    e: { r: m.e.r + 1, c: m.e.c }
+                }));
+            }
+
+            XLSX.utils.book_append_sheet(workbook, ws, sheetName);
+        });
+
+        if (workbook.SheetNames.length === 0) {
+            alert("Нет данных для экспорта.");
+            return;
+        }
+
+        const orderHeader = document.querySelector("h2");
+        let orderNumber = "export";
+        if (orderHeader) {
+            const match = orderHeader.textContent.match(/#(\d+)/);
+            if (match) orderNumber = match[1];
+        }
+
+        const wbout = XLSX.write(workbook, { bookType: 'xlsx', type: 'array' });
+        const blob = new Blob([wbout], { type: 'application/octet-stream' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `Детали_заказа_${orderNumber}.xlsx`;
+        link.click();
+        URL.revokeObjectURL(link.href);
     });
 </script>
 {% endblock %}
