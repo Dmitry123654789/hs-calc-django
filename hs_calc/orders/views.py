@@ -2,6 +2,7 @@ from decimal import Decimal, ROUND_HALF_UP
 from json import dumps, loads
 
 from django.db import transaction
+from django.contrib.auth.mixins import LoginRequiredMixin
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.generic import DetailView, ListView, View
@@ -57,13 +58,19 @@ def serialize_product(instance):
     return result
 
 
-class OrderListView(ListView):
+class OrderListView(ListView, LoginRequiredMixin):
     model = Order
     template_name = "orders/list.html"
     context_object_name = "orders_data"
 
     def get_queryset(self):
-        return Order.objects.select_related("buyer").order_by("-created_at")
+        queryset = Order.objects.select_related("buyer").order_by("-created_at")
+        user = self.request.user
+
+        if user.profile.is_worker:
+            return queryset.filter(status=Order.Status.In_work)
+
+        return queryset
 
 
 class OrderDetailView(BackURLMixin, ManagerRequiredMixin, DetailView):
@@ -134,6 +141,19 @@ class OrderDetailMaterialsView(BackURLMixin, OnlyWorkerRequiredMixin, DetailView
         context["portals"] = self.object.portal_set.all()
         context["glukhars"] = self.object.glukhar_set.all()
         context["back_url"] = self.get_back_url()
+        context["replace_dict"] = {
+            "hardware": "Фурнитура",
+            "ral_enamel": "RAL-эмаль",
+            "ral_primer": "RAL-грунт",
+            "glass_doors": "Стеклопакет створка",
+            "glass_sashes": "Стеклопакет глухарь",
+            "sash": "Створка",
+            "lock": "Замок",
+            "packaging": "Упаковка",
+            "glass": "Стеклопакет",
+            "carpenter": "Столяр",
+            "painter": "Маляр",
+        }
         return context
 
 

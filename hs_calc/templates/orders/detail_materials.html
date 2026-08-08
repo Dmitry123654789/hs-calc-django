@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load dict_extras %}
 
 {% block title %}Детали заказа #{{ order.id }}{% endblock %}
 
@@ -36,12 +37,12 @@
             <div class="tab-content" id="portalSubTabsContent">
                 <div class="tab-pane fade show active" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
                     {% for product in portals %}
-                        {% if product.calculation_details.workpiece %}
+                        {% if product.calculation_details.materials %}
                             <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
                                 Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
                                 <span class="fs-6 fw-normal text-muted product-area-display"></span>
                             </h4>
-                            {% for scheme_name, scheme_data in product.calculation_details.workpiece.items %}
+                            {% for scheme_name, scheme_data in product.calculation_details.materials.items %}
                                 <div class="card mb-4 shadow-sm border-secondary">
                                     <div class="card-header bg-primary text-white">
                                         <h5 class="mb-0">Схема {{ scheme_name }} (Материалы)</h5>
@@ -49,8 +50,8 @@
                                     <div class="card-body p-0">
                                         <div class="table-responsive">
                                             <table class="table table-bordered table-hover mb-0 align-middle main-table export-table"
-                                                   data-sheet-name="Портал_{{ product.calculation_details.N }}_{{ scheme_name }}"
-                                                   data-portal-n="{{ product.calculation_details.N }}"
+                                                   data-sheet-name="Портал_{{ product.calculation_details.amount }}_{{ scheme_name }}"
+                                                   data-portal-n="{{ product.calculation_details.amount }}"
                                                    data-scheme-name="{{ scheme_name }}">
                                                 <thead class="table-dark">
                                                     <tr>
@@ -61,11 +62,12 @@
                                                 </thead>
                                                 <tbody>
                                                     {% for detail_name, detail_data in scheme_data.items %}
+                                                        {% if detail_name != "labor_carpenter" and detail_name != "labor_painter" %}
                                                         {% if detail_data and detail_data.price is not None %}
                                                             {% for size, count in detail_data.w_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
                                                                 <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
-                                                                    <td class="cell-name">{{ detail_name }}</td>
+                                                                    <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td>{{ size }}</td>
                                                                     <td>{{ count }}</td>
                                                                 </tr>
@@ -75,12 +77,13 @@
                                                             {% for size, count in detail_data.h_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
                                                                 <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
-                                                                    <td class="cell-name">{{ detail_name }}</td>
+                                                                    <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td>{{ size }}</td>
                                                                     <td>{{ count }}</td>
                                                                 </tr>
                                                                 {% endif %}
                                                             {% endfor %}
+                                                        {% endif %}
                                                         {% endif %}
                                                     {% endfor %}
                                                 </tbody>
@@ -107,8 +110,8 @@
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-bordered table-hover mb-0 align-middle export-table"
-                                   data-sheet-name="Глухарь_{{ product.calculation_details.N|default:forloop.counter }}"
-                                   data-glukhar-n="{{ product.calculation_details.N|default:forloop.counter }}">
+                                   data-sheet-name="Глухарь_{{ product.calculation_details.amount|default:forloop.counter }}"
+                                   data-glukhar-n="{{ product.calculation_details.amount|default:forloop.counter }}">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Наименование</th>
@@ -117,10 +120,9 @@
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {% for key, val in product.calculation_details.items %}
-                                        {% if key != 'type' and key != 'N' and key != 'ИТОГО' and key != 'price_with_ratio' %}
+                                    {% for key, val in product.calculation_details.materials.items %}
                                         <tr>
-                                            <td>{{ key }}</td>
+                                            <td>{{ key|get_or_self:replace_dict }}</td>
                                             <td>
                                                 {% if val.length.w %}
                                                     {{ val.length.w }} x {{ val.length.h }}
@@ -128,9 +130,15 @@
                                                     {{ val.length }}
                                                 {% endif %}
                                             </td>
-                                            <td>{{ val.N_amount }}</td>
+                                            <td>{{ val.total_amount }}</td>
                                         </tr>
-                                        {% endif %}
+                                    {% endfor %}
+                                    {% for key, val in product.calculation_details.labor.items %}
+                                        <tr>
+                                            <td>{{ key|get_or_self:replace_dict }}</td>
+                                            <td>{{ val.length }}</td>
+                                            <td>{{ val.total_amount }}</td>
+                                        </tr>
                                     {% endfor %}
                                 </tbody>
                             </table>
