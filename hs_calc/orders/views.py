@@ -87,7 +87,19 @@ class OrderDetailView(BackURLMixin, ManagerRequiredMixin, DetailView):
             Decimal("1"),
             rounding=ROUND_HALF_UP,
         )
-
+        context["replace_dict"] = {
+            "hardware": "Фурнитура",
+            "ral_enamel": "RAL-эмаль",
+            "ral_primer": "RAL-грунт",
+            "glass_doors": "Стеклопакет створка",
+            "glass_sashes": "Стеклопакет глухарь",
+            "sash": "Створка",
+            "lock": "Замок",
+            "packaging": "Упаковка",
+            "glass": "Стеклопакет",
+            "carpenter": "Столяр",
+            "painter": "Маляр",
+        }
         return context
 
 

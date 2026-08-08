@@ -1,5 +1,6 @@
 {% extends "base.html" %}
 {% load static %}
+{% load dict_extras %}
 
 {% block title %}Детали заказа #{{ order.id }}{% endblock %}
 
@@ -35,7 +36,12 @@
             
             <ul class="nav nav-pills mb-4" id="portalSubTabs" role="tablist">
                 <li class="nav-item" role="presentation">
-                    <button class="nav-link active" id="portal-materials-tab" data-bs-toggle="pill" data-bs-target="#portal-materials-pane" type="button" role="tab" aria-controls="portal-materials-pane" aria-selected="true">
+                    <button class="nav-link active" id="portal-summary-tab" data-bs-toggle="pill" data-bs-target="#portal-summary-pane" type="button" role="tab" aria-controls="portal-summary-pane" aria-selected="true">
+                        Общее
+                    </button>
+                </li>
+                <li class="nav-item" role="presentation">
+                    <button class="nav-link" id="portal-materials-tab" data-bs-toggle="pill" data-bs-target="#portal-materials-pane" type="button" role="tab" aria-controls="portal-materials-pane" aria-selected="false">
                         Материалы
                     </button>
                 </li>
@@ -47,7 +53,7 @@
             </ul>
 
             <div class="tab-content" id="portalSubTabsContent">
-                <div class="tab-pane fade show active" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
+                <div class="tab-pane fade" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
                     {% for product in portals %}
                         {% if product.calculation_details.materials %}
                             <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
@@ -73,11 +79,12 @@
                                                 </thead>
                                                 <tbody>
                                                     {% for detail_name, detail_data in scheme_data.items %}
+                                                        {% if detail_name != "labor_carpenter" and detail_name != "labor_painter" %}
                                                         {% if detail_data and detail_data.price is not None %}
                                                             {% for size, count in detail_data.w_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
                                                                 <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
-                                                                    <td class="cell-name">{{ detail_name }}</td>
+                                                                    <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td class="cell-price">{{ detail_data.price }}</td>
                                                                     <td>{{ size }}</td>
                                                                     <td>{{ count }}</td>
@@ -88,13 +95,14 @@
                                                             {% for size, count in detail_data.h_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
                                                                 <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
-                                                                    <td class="cell-name">{{ detail_name }}</td>
+                                                                    <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td class="cell-price">{{ detail_data.price }}</td>
                                                                     <td>{{ size }}</td>
                                                                     <td>{{ count }}</td>
                                                                 </tr>
                                                                 {% endif %}
                                                             {% endfor %}
+                                                        {% endif %}
                                                         {% endif %}
                                                     {% endfor %}
                                                     <tr class="table-secondary fw-bold total-row">
@@ -137,7 +145,7 @@
                                         <tbody>
                                             {% for detail, costs in labor_details.items %}
                                             <tr class="labor-row" data-stolyar="{{ costs.carpenter }}" data-malyar="{{ costs.painter }}">
-                                                <td>{{ detail }}</td>
+                                                <td>{{ detail|get_or_self:replace_dict }}</td>
                                                 <td>{{ costs.carpenter }}</td>
                                                 <td>{{ costs.painter }}</td>
                                             </tr>
@@ -151,6 +159,46 @@
                                     </table>
                                 </div>
                             </div>
+                            {% endfor %}
+                        {% endif %}
+                    {% endfor %}
+                </div>
+
+                <div class="tab-pane fade show active" id="portal-summary-pane" role="tabpanel" aria-labelledby="portal-summary-tab">
+                    {% for product in portals %}
+                        {% if product.calculation_details.materials %}
+                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                                Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
+                                <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                            </h4>
+                            {% for scheme_name, scheme_data in product.calculation_details.materials.items %}
+                                <div class="card mb-4 shadow-sm">
+                                    <div class="card-header bg-dark text-white">
+                                        <h5 class="mb-0">Схема {{ scheme_name }} (Общее)</h5>
+                                    </div>
+                                    <div class="card-body p-0">
+                                        <table class="table table-bordered mb-0 align-middle summary-table">
+                                            <tbody>
+                                                <tr>
+                                                    <td class="fw-semibold">Стоимость материалов</td>
+                                                    <td class="summary-materials-cell" data-sheet-name="Портал_{{ product.calculation_details.amount }}_{{ scheme_name }}">—</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Стоимость работы столяра</td>
+                                                    <td>{{ scheme_data.labor_carpenter.price }}</td>
+                                                </tr>
+                                                <tr>
+                                                    <td class="fw-semibold">Стоимость работы маляра</td>
+                                                    <td>{{ scheme_data.labor_painter.price }}</td>
+                                                </tr>
+                                                <tr class="table-secondary fw-bold">
+                                                    <td>ИТОГО (с коэффициентом)</td>
+                                                    <td>{{ product.calculation_details.total_with_ratio }}</td>
+                                                </tr>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
                             {% endfor %}
                         {% endif %}
                     {% endfor %}
@@ -182,7 +230,13 @@
                                 <tbody>
                                     {% for key, val in product.calculation_details.materials.items %}
                                         <tr>
-                                            <td>{{ key }}</td>
+                                            <td>
+                                                {% if key|slice:":5" == "beam_" %}
+                                                    Брус ({{ key|slice:"5:" }})
+                                                {% else %}
+                                                    {{ key|get_or_self:replace_dict }}
+                                                {% endif %}
+                                            </td>
                                             <td>{{ val.price }}</td>
                                             <td>
                                                 {% if val.length.w %}
@@ -197,7 +251,7 @@
                                     {% endfor %}
                                     {% for key, val in product.calculation_details.labor.items %}
                                         <tr>
-                                            <td>{{ key }}</td>
+                                            <td>{{ key|get_or_self:replace_dict }}</td>
                                             <td>{{ val.price }}</td>
                                             <td>{{ val.length }}</td>
                                             <td>{{ val.total_amount }}</td>
@@ -206,7 +260,7 @@
                                     {% endfor %}
                                     <tr class="table-secondary fw-bold">
                                         <td colspan="4" class="text-end pe-3">ИТОГО за изделие:</td>
-                                        <td>{{ product.calculation_details.total }}</td>
+                                        <td>{{ product.calculation_details.total_with_ratio }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -371,6 +425,11 @@
 
             const totalCell = table.querySelector(".total-price-cell");
             if (totalCell) totalCell.textContent = totalPrice.toFixed(2);
+
+            // Пробрасываем ту же сумму (материалы без учета работы) во вкладку "Общее"
+            const sheetName = table.getAttribute("data-sheet-name");
+            const summaryCell = document.querySelector(`.summary-materials-cell[data-sheet-name="${sheetName}"]`);
+            if (summaryCell) summaryCell.textContent = totalPrice.toFixed(2);
         });
 
         // Подсчет итогов для Порталов (Трудозатраты)

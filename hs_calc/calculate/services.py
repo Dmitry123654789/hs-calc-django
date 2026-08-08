@@ -775,7 +775,8 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
                 common_length = mul_dict(has_w_list) + mul_dict(has_h_list)
 
                 result[scheme][beam] = {
-                    "carpenter": dec_ceil(common_length * beam_price_carpenter / THOUSAND),
+                    "carpenter":
+                        dec_ceil(common_length * beam_price_carpenter / THOUSAND),
                     "painter": dec_ceil(common_length * beam_price_painter / THOUSAND),
                 }
                 continue
@@ -808,12 +809,16 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
         }
 
         result[scheme]["lock"] = {
-            "carpenter": dec_ceil(to_decimal(door_amount) * get_salary("lock", "carpenter")),
+            "carpenter": dec_ceil(
+                to_decimal(door_amount) * get_salary("lock", "carpenter"),
+            ),
             "painter": dec_ceil(to_decimal(door_amount) * get_salary("lock", "painter")),
         }
 
         result[scheme]["packaging"] = {
-            "carpenter": dec_ceil(to_decimal(stvorki) * get_salary("package", "carpenter")),
+            "carpenter": dec_ceil(
+                to_decimal(stvorki) * get_salary("package", "carpenter"),
+            ),
             "painter": dec_ceil(to_decimal(stvorki) * get_salary("package", "painter")),
         }
 
