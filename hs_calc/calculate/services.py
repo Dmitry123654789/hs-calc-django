@@ -102,6 +102,36 @@ def as_number(value):
     return value
 
 
+def decimal_to_number(value: Decimal):
+    """Decimal -> int/float для JSON-сериализации.
+
+    Целые значения приводятся к int, дробные - к float. Используется
+    только на выходе итоговых результатов (см. jsonify_result), сами
+    расчёты продолжают вестись в Decimal, чтобы не терять точность.
+    """
+    integral = value.to_integral_value()
+    if value == integral:
+        return int(integral)
+
+    return float(value)
+
+
+def jsonify_result(data: Decimal | dict | list):
+    """Рекурсивно обходит структуру (dict/list/значения) и приводит
+    все Decimal к обычным числам (int/float), чтобы в итоговом JSON
+    они сохранялись как числа, а не как строки."""
+    if isinstance(data, Decimal):
+        return decimal_to_number(data)
+
+    if isinstance(data, dict):
+        return {key: jsonify_result(value) for key, value in data.items()}
+
+    if isinstance(data, (list, tuple)):
+        return [jsonify_result(value) for value in data]
+
+    return data
+
+
 def _first_two(values) -> list[Decimal]:
     result = [to_decimal(value) for value in values]
     while len(result) < 2:
@@ -1042,7 +1072,7 @@ def calculate_portals(portals: list) -> dict:
     result["total"] = money(total_price)
     result["total_with_ratio"] = money(total_price_with_ratio)
 
-    return result
+    return jsonify_result(result)
 
 
 def calculate_glukhar_color(color: str, width, height, n_amount) -> dict:
@@ -1212,4 +1242,4 @@ def calculate_glukhar(glukhar_data: list, ratio) -> dict:
     result["total_with_ratio"] = money(total_price_with_ratio)
     result["ratio"] = as_number(ratio_dec)
 
-    return result
+    return jsonify_result(result)

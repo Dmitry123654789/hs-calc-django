@@ -5,9 +5,7 @@ register = template.Library()
 
 @register.filter(name="get_or_self")
 def get_or_self(key, mapping):
-    print(key, mapping)
     if isinstance(mapping, dict) and key in mapping:
-        print(mapping[key])
         return mapping[key]
 
     return key

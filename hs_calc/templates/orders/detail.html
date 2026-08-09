@@ -68,7 +68,8 @@
                                     <div class="card-body p-0">
                                         <div class="table-responsive">
                                             <table class="table table-bordered table-hover mb-0 align-middle main-table export-table" 
-                                                   data-sheet-name="Портал_{{ product.calculation_details.amount }}_{{ scheme_name }}">
+                                                   data-sheet-name="Портал_{{ scheme_name }}_{{ product.id }}"
+                                                   data-amount="{{ product.amount }}">
                                                 <thead class="table-dark">
                                                     <tr>
                                                         <th>ВИД</th>
@@ -83,7 +84,7 @@
                                                         {% if detail_data and detail_data.price is not None %}
                                                             {% for size, count in detail_data.w_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
-                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-display-name="{{ detail_name|get_or_self:replace_dict }}" data-detail-price="{{ detail_data.price }}">
                                                                     <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td class="cell-price">{{ detail_data.price }}</td>
                                                                     <td>{{ size }}</td>
@@ -94,7 +95,7 @@
                                                             
                                                             {% for size, count in detail_data.h_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
-                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-price="{{ detail_data.price }}">
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-display-name="{{ detail_name|get_or_self:replace_dict }}" data-detail-price="{{ detail_data.price }}">
                                                                     <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td class="cell-price">{{ detail_data.price }}</td>
                                                                     <td>{{ size }}</td>
@@ -106,7 +107,7 @@
                                                         {% endif %}
                                                     {% endfor %}
                                                     <tr class="table-secondary fw-bold total-row">
-                                                        <td>ИТОГО ПО МАТЕРИАЛАМ</td>
+                                                        <td>ИТОГО ЗА 1 ШТ.</td>
                                                         <td class="total-price-cell">0.00</td>
                                                         <td colspan="2"></td>
                                                     </tr>
@@ -134,7 +135,8 @@
                                 </div>
                                 <div class="card-body p-0">
                                     <table class="table table-striped table-bordered mb-0 labor-table export-table" 
-                                           data-sheet-name="Труд_П{{ product.calculation_details.amount }}_{{ labor_scheme }}">
+                                           data-sheet-name="Труд_{{ labor_scheme }}_{{ product.id }}"
+                                           data-amount="{{ product.amount }}">
                                         <thead class="table-dark">
                                             <tr>
                                                 <th>Деталь</th>
@@ -151,7 +153,7 @@
                                             </tr>
                                             {% endfor %}
                                             <tr class="table-secondary fw-bold">
-                                                <td>ИТОГО</td>
+                                                <td>ИТОГО ЗА 1 ШТ.</td>
                                                 <td class="total-stolyar-cell">0.00</td>
                                                 <td class="total-malyar-cell">0.00</td>
                                             </tr>
@@ -181,15 +183,15 @@
                                             <tbody>
                                                 <tr>
                                                     <td class="fw-semibold">Стоимость материалов</td>
-                                                    <td class="summary-materials-cell" data-sheet-name="Портал_{{ product.calculation_details.amount }}_{{ scheme_name }}">—</td>
+                                                    <td class="summary-materials-cell" data-sheet-name="Портал_{{ scheme_name }}_{{ product.id }}">—</td>
                                                 </tr>
                                                 <tr>
                                                     <td class="fw-semibold">Стоимость работы столяра</td>
-                                                    <td>{{ scheme_data.labor_carpenter.price }}</td>
+                                                    <td>{% widthratio scheme_data.labor_carpenter.price 1 product.amount %}</td>
                                                 </tr>
                                                 <tr>
                                                     <td class="fw-semibold">Стоимость работы маляра</td>
-                                                    <td>{{ scheme_data.labor_painter.price }}</td>
+                                                    <td>{% widthratio scheme_data.labor_carpenter.price 1 product.amount %}</td>
                                                 </tr>
                                                 <tr class="table-secondary fw-bold">
                                                     <td>ИТОГО (с коэффициентом)</td>
@@ -217,7 +219,7 @@
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body p-0">
                         <div class="table-responsive">
-                            <table class="table table-bordered table-hover mb-0 align-middle export-table" data-sheet-name="Глухарь_{{ product.calculation_details.amount|default:forloop.counter }}">
+                            <table class="table table-bordered table-hover mb-0 align-middle export-table" data-sheet-name="Глухарь_{{ product.id }}" data-amount="{{ product.amount }}">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Наименование</th>
@@ -278,7 +280,15 @@
             
             <div class="input-group" style="width: auto;">
                 <select class="form-select form-select-sm" id="excelExportType" style="max-width: 280px;">
-                    <option value="all">Что-то</option>
+                    <option value="all">Весь заказ (Все таблицы)</option>
+                    {% if portals %}
+                        <option value="portal_all">Порталы: все данные</option>
+                        <option value="portal_materials">Порталы: только материалы</option>
+                        <option value="portal_labor">Порталы: только трудозатраты</option>
+                    {% endif %}
+                    {% if glukhars %}
+                        <option value="glukhars_only">Только глухари</option>
+                    {% endif %}
                 </select>
                 <button class="btn btn-success btn-sm" type="button" onclick="triggerExcelExport()">
                     <i class="bi bi-file-earmark-excel"></i> Сохранить в Excel
@@ -459,8 +469,308 @@
 
     // Функция-обертка для чтения значения селекта и запуска выгрузки
     function triggerExcelExport() {
-        alert("реализовать генерацию excel файла с помощью xlsx.full.min.js")
-        // TODO: реализовать генерацию excel файла с помощью xlsx.full.min.js
+        const selectElem = document.getElementById('excelExportType');
+        const scope = selectElem ? selectElem.value : 'all';
+        exportOrderToExcel(scope);
+    }
+
+    function exportOrderToExcel(scope) {
+        if (typeof XLSX === 'undefined') {
+            alert('Ошибка: Библиотека xlsx.full.min.js не загружена.');
+            return;
+        }
+
+        const wb = XLSX.utils.book_new();
+        const orderId = {{ order.id }};
+        let fileNameSuffix = '';
+        const COLUMN_WIDTH = 22; // ширина всех колонок во всех листах, в условных единицах
+
+        // ---- Вспомогательные функции для извлечения данных ----
+
+        // Устанавливает одинаковую ширину для всех колонок листа
+        function setColumnWidths(ws, colCount) {
+            ws['!cols'] = Array(colCount).fill({ wch: COLUMN_WIDTH });
+        }
+
+        // Добавляет отступ в одну пустую строку и строку "Количество товара:"
+        // в конец данных листа (для портала/глухаря)
+        function appendAmountRow(wsData, amount, colCount) {
+            if (amount === null || amount === undefined || amount === '') return wsData;
+            const emptyRow = Array(colCount).fill('');
+            wsData.push(emptyRow);
+            const amountRow = Array(colCount).fill('');
+            amountRow[0] = 'Количество товара:';
+            amountRow[1] = amount;
+            wsData.push(amountRow);
+            return wsData;
+        }
+
+        // Извлечение строк материалов из таблицы (с учётом rowspan в DOM)
+        function extractMaterialRows(table) {
+            const rows = table.querySelectorAll('tbody tr.detail-row');
+            const items = [];
+            rows.forEach(row => {
+                const name = row.getAttribute('data-detail-name');
+                const displayName = row.getAttribute('data-detail-display-name') || name;
+                const price = parseFloat(row.getAttribute('data-detail-price')) || 0;
+                const cells = row.querySelectorAll('td');
+                // После применения rowspan в строке может быть 4 или 2 ячейки
+                let sizeCell, countCell;
+                if (cells.length === 4) {
+                    sizeCell = cells[2];
+                    countCell = cells[3];
+                } else if (cells.length === 2) {
+                    sizeCell = cells[0];
+                    countCell = cells[1];
+                } else {
+                    // fallback – берём последние две
+                    sizeCell = cells[cells.length - 2];
+                    countCell = cells[cells.length - 1];
+                }
+                const size = sizeCell.textContent.trim();
+                const count = countCell.textContent.trim();
+                items.push({ name, displayName, price, size, count });
+            });
+            return items;
+        }
+
+        // Построение данных для листа материалов с группировкой и слиянием
+        function buildMaterialSheet(items) {
+            const groups = new Map();
+            items.forEach(item => {
+                const key = item.name + '|' + item.price;
+                if (!groups.has(key)) {
+                    groups.set(key, { name: item.displayName, price: item.price, rows: [] });
+                }
+                groups.get(key).rows.push({ size: item.size, count: item.count });
+            });
+
+            const dataRows = [];
+            const merges = [];
+
+            groups.forEach(group => {
+                const countRows = group.rows.length;
+                const firstRow = [group.name, group.rows[0].count, group.rows[0].size, group.price];
+                dataRows.push(firstRow);
+                if (countRows > 1) {
+                    const startRow = dataRows.length - 1;
+                    for (let i = 1; i < countRows; i++) {
+                        dataRows.push(['', group.rows[i].count, group.rows[i].size, '']);
+                    }
+                    const endRow = dataRows.length - 1;
+                    merges.push({ s: { r: startRow, c: 0 }, e: { r: endRow, c: 0 } }); // Наименование
+                    merges.push({ s: { r: startRow, c: 3 }, e: { r: endRow, c: 3 } }); // Стоимость
+                }
+            });
+
+            return { data: dataRows, merges: merges };
+        }
+
+        // Получение итоговой строки материалов
+        function getMaterialTotal(table) {
+            const totalRow = table.querySelector('tr.total-row');
+            if (!totalRow) return null;
+            const cells = totalRow.querySelectorAll('td');
+            if (cells.length < 2) return null;
+            const label = cells[0].textContent.trim();
+            const total = parseFloat(cells[1].textContent) || 0;
+            return { label, total: Math.round(total) };
+        }
+
+        // Извлечение данных трудозатрат
+        function extractLaborRows(table) {
+            const rows = table.querySelectorAll('tbody tr.labor-row');
+            const data = [];
+            rows.forEach(row => {
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 3) return;
+                const detail = cells[0].textContent.trim();
+                const stolyar = parseFloat(cells[1].textContent) || 0;
+                const malyar = parseFloat(cells[2].textContent) || 0;
+                data.push({ detail, stolyar: Math.round(stolyar), malyar: Math.round(malyar) });
+            });
+            return data;
+        }
+
+        // Получение итоговой строки трудозатрат
+        function getLaborTotal(table) {
+            const totalRow = table.querySelector('tr.table-secondary.fw-bold');
+            if (!totalRow) return null;
+            const cells = totalRow.querySelectorAll('td');
+            if (cells.length < 3) return null;
+            const label = cells[0].textContent.trim();
+            const stolyar = parseFloat(cells[1].textContent) || 0;
+            const malyar = parseFloat(cells[2].textContent) || 0;
+            return { label, stolyar: Math.round(stolyar), malyar: Math.round(malyar) };
+        }
+
+        // Извлечение строк листа "глухарь" (5 колонок: Наименование, Цена, Размер, Кол-во, Сумма)
+        function extractGlukharSheet(table) {
+            const rows = table.querySelectorAll('tbody tr');
+            const data = [];
+            rows.forEach(row => {
+                if (row.classList.contains('table-secondary') && row.classList.contains('fw-bold')) return;
+                const cells = row.querySelectorAll('td');
+                if (cells.length < 5) return;
+                const name = cells[0].textContent.trim();
+                const pricePerUnit = parseFloat(cells[1].textContent) || 0;
+                const size = cells[2].textContent.trim();
+                const count = parseFloat(cells[3].textContent) || 0;
+                const total = parseFloat(cells[4].textContent) || 0;
+                data.push([
+                    name,
+                    Math.round(count),
+                    size,
+                    Math.round(pricePerUnit),
+                    Math.round(total)
+                ]);
+            });
+            return data;
+        }
+
+        function addGlukharSheets(wb) {
+            const glukharTables = document.querySelectorAll('.export-table:not(#extra-costs-table)');
+            glukharTables.forEach(table => {
+                const sheetName = table.getAttribute('data-sheet-name');
+                if (!sheetName || !sheetName.startsWith('Глухарь_')) return;
+
+                const data = extractGlukharSheet(table);
+                if (data.length) {
+                    const wsData = [
+                        ['Наименование', 'Кол-во', 'Размер', 'Стоимость за ед', 'Стоимость за всё'],
+                        ...data
+                    ];
+                    const amount = table.getAttribute('data-amount');
+                    appendAmountRow(wsData, amount, 5);
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    setColumnWidths(ws, 5);
+                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                }
+            });
+        }
+
+        // Извлечение данных из таблицы "Дополнительные параметры и Итоги заказа"
+        function getExtraCostsData() {
+            const table = document.getElementById('extra-costs-table');
+            if (!table) return null;
+            const rows = table.querySelectorAll('tbody tr');
+            if (rows.length < 3) return null;
+            const row1 = rows[0].querySelectorAll('td');
+            const row3 = rows[2].querySelectorAll('td');
+            if (row1.length < 5 || row3.length < 4) return null;
+
+            const getNumber = (txt) => {
+                const num = parseFloat(txt.replace(/[^0-9.,-]/g, '').replace(',', '.'));
+                return isNaN(num) ? 0 : Math.round(num);
+            };
+
+            return [
+                ['Скидка', getNumber(row1[0].textContent)],
+                ['Доставка', getNumber(row1[1].textContent)],
+                ['Разгрузка', getNumber(row1[2].textContent)],
+                ['Ставка монтажа', getNumber(row1[3].textContent)],
+                ['Стоимость монтажа', getNumber(row1[4].textContent)],
+                ['Итого по заказу', getNumber(row3[0].textContent)],
+                ['Процент дилера', getNumber(row3[1].textContent)],
+                ['Сумма дилера', getNumber(row3[2].textContent)],
+                ['Создал', row3[3].textContent.trim()]
+            ];
+        }
+
+        // ---- Формирование листов в зависимости от scope ----
+
+        // 1. Только глухари
+        if (scope === 'glukhars_only') {
+            addGlukharSheets(wb);
+            fileNameSuffix = 'Глухари';
+        }
+
+        // 2. Порталы
+        if (['all', 'portal_all', 'portal_materials', 'portal_labor'].includes(scope)) {
+            const materialTables = document.querySelectorAll('.main-table');
+            const laborTables = document.querySelectorAll('.labor-table');
+
+            // Материалы
+            if (['all', 'portal_all', 'portal_materials'].includes(scope)) {
+                materialTables.forEach(table => {
+                    const sheetName = table.getAttribute('data-sheet-name') || 'Материалы';
+                    const items = extractMaterialRows(table);
+                    const { data, merges } = buildMaterialSheet(items);
+                    const total = getMaterialTotal(table);
+                    if (total) {
+                        data.push([total.label, '', '', total.total]);
+                    }
+
+                    const wsData = [
+                        ['Наименование', 'Кол-во', 'Размер, мм', 'Стоимость'],
+                        ...data
+                    ];
+                    const amount = table.getAttribute('data-amount');
+                    appendAmountRow(wsData, amount, 4);
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    if (merges.length) {
+                        ws['!merges'] = merges.map(m => ({
+                            s: { r: m.s.r + 1, c: m.s.c },
+                            e: { r: m.e.r + 1, c: m.e.c }
+                        }));
+                    }
+                    setColumnWidths(ws, 4);
+                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                });
+            }
+
+            // Трудозатраты
+            if (['all', 'portal_all', 'portal_labor'].includes(scope)) {
+                laborTables.forEach(table => {
+                    const sheetName = table.getAttribute('data-sheet-name') || 'Трудозатраты';
+                    const data = extractLaborRows(table);
+                    const total = getLaborTotal(table);
+                    if (total) {
+                        data.push({ detail: total.label, stolyar: total.stolyar, malyar: total.malyar });
+                    }
+
+                    const wsData = [
+                        ['Наименование', 'Работа столяра', 'Работа маляра'],
+                        ...data.map(row => [row.detail, row.stolyar, row.malyar])
+                    ];
+                    const amount = table.getAttribute('data-amount');
+                    appendAmountRow(wsData, amount, 3);
+                    const ws = XLSX.utils.aoa_to_sheet(wsData);
+                    setColumnWidths(ws, 3);
+                    XLSX.utils.book_append_sheet(wb, ws, sheetName);
+                });
+            }
+
+            fileNameSuffix = scope === 'portal_materials' ? 'Порталы_Материалы' :
+                             scope === 'portal_labor'    ? 'Порталы_Трудозатраты' :
+                             scope === 'portal_all'      ? 'Порталы_Все' :
+                             'Полная_Спецификация';
+        }
+
+        // 3. Глухари и допуслуги (только при all)
+        if (scope === 'all') {
+            addGlukharSheets(wb);
+
+            // Дополнительные услуги
+            const extraData = getExtraCostsData();
+            if (extraData) {
+                const wsData = [
+                    ['Наименование', 'Стоимость'],
+                    ...extraData
+                ];
+                const ws = XLSX.utils.aoa_to_sheet(wsData);
+                setColumnWidths(ws, 2);
+                XLSX.utils.book_append_sheet(wb, ws, 'Доп_Услуги');
+            }
+            fileNameSuffix = 'Полная_Спецификация';
+        }
+
+        // ---- Сохранение файла ----
+        if (wb.SheetNames.length === 0) {
+            alert('Нет данных для экспорта при выбранных критериях.');
+            return;
+        }
+        XLSX.writeFile(wb, `Заказ_${orderId}_${fileNameSuffix}.xlsx`);
     }
 </script>
 {% endblock %}

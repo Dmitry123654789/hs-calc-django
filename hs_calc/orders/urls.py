@@ -16,7 +16,7 @@ urlpatterns = [
     path("glukhar-order/", views.GlukharOrderView.as_view(), name="glukhar_order"),
     path(
         "glukhar-order/save/",
-        views.SaveGlukharOrderView.as_view(),
+        views.GlukharOrderSaveView.as_view(),
         name="glukhar_order_save",
     ),
     path("portal-order/", views.PortalOrderView.as_view(), name="portal_order"),

@@ -116,7 +116,6 @@
         // Глобальные переменные для динамического пересчета
         let baseTotalPrice = 0;
         let totalArea = 0;
-        let lastGrandTotal = 0;
         let savedOrderId = null;
         // Шаблон ссылки на скачивание КП с плейсхолдером id=0, который
         // подменяем на реальный order_id после сохранения заказа.
@@ -124,7 +123,6 @@
 
         const isAdmin = {{ is_admin|yesno:"true,false" }};
         const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
-        const profitRatioFromContext = parseFloat('{{ profit_ratio }}') || 1.0;
 
         // --- ФУНКЦИЯ КРАСИВЫХ АЛЕРТОВ ---
         function showAlert(message, type = 'danger') {
@@ -371,7 +369,6 @@
         // 5. Логика динамического пересчета и контроля минимумов
         function enforceMinimumsAndRecalculate() {
             const finalTotal = getFinalTotal();
-            lastGrandTotal = finalTotal;
             document.getElementById('dynamicGrandTotal').textContent = `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
 
             if (!isAdmin) {
@@ -387,10 +384,9 @@
             const installRate = parseFloat(document.getElementById('installRate').value) || 0;
             const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
             const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
-            const ratio = profitRatioFromContext;
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
-            const subTotal = (baseTotalPrice * ratio) + (totalArea * installRate) + delivery + unloading;
+            const subTotal = parseFloat(lastCalculationResult['total_with_ratio']) + (totalArea * installRate) + delivery + unloading;
             
             return subTotal - discount;
         }
@@ -406,7 +402,7 @@
             payload.delivery = parseFloat(document.getElementById('deliveryCost').value);
             payload.unloading = parseFloat(document.getElementById('unloadingCost').value);
             payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
-            payload.order_total = lastGrandTotal;
+            payload.order_total = getFinalTotal();
             
             if (payload.buyer_id === 'new') {
                 payload.buyer_data = {

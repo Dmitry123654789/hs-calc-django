@@ -1,8 +1,8 @@
 from decimal import Decimal, ROUND_HALF_UP
 from json import dumps, loads
 
-from django.db import transaction
 from django.contrib.auth.mixins import LoginRequiredMixin
+from django.db import transaction
 from django.http import Http404, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, render
 from django.views.generic import DetailView, ListView, View
@@ -44,6 +44,7 @@ REPLACE_DICT = {
     "glaze_varnish": "Лесс-лак",
     "glaze_primer": "Лесс-грунт",
 }
+
 
 def calculate_dealer_percentage(user):
     if user.profile.is_manager:
@@ -437,7 +438,7 @@ class GlukharOrderView(ManagerRequiredMixin, View):
         return JsonResponse(calc_result)
 
 
-class SaveGlukharOrderView(ManagerRequiredMixin, View):
+class GlukharOrderSaveView(ManagerRequiredMixin, View):
     def post(self, request, *args, **kwargs):
         data = loads(request.body)
 
