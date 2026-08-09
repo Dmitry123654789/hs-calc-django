@@ -38,9 +38,9 @@
                 <div class="tab-pane fade show active" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
                     {% for product in portals %}
                         {% if product.calculation_details.materials %}
-                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-amount="{{ product.amount }}" data-area="{{ product.calculation_details.area }}">
                                 Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
-                                <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                                <span class="fs-6 fw-normal text-muted product-area-display">| Площадь 1 шт: {{ product.calculation_details.area }} м²{% if product.amount > 1 %} (Общая: {% widthratio product.calculation_details.area 1 product.amount %} м²){% endif %}</span>
                             </h4>
                             {% for scheme_name, scheme_data in product.calculation_details.materials.items %}
                                 <div class="card mb-4 shadow-sm border-secondary">
@@ -50,7 +50,8 @@
                                     <div class="card-body p-0">
                                         <div class="table-responsive">
                                             <table class="table table-bordered table-hover mb-0 align-middle main-table export-table"
-                                                   data-sheet-name="Портал_{{ scheme_name }}_{{ product.id }}">
+                                                   data-sheet-name="Портал_{{ scheme_name }}_{{ product.id }}"
+                                                   data-amount="{{ product.amount }}">
                                                 <thead class="table-dark">
                                                     <tr>
                                                         <th>ВИД</th>
@@ -64,7 +65,7 @@
                                                         {% if detail_data and detail_data.price is not None %}
                                                             {% for size, count in detail_data.w_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
-                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-translated-name="{{ detail_name|get_or_self:replace_dict }}" data-detail-price="{{ detail_data.price }}">
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-display-name="{{ detail_name|get_or_self:replace_dict }}" data-detail-price="{{ detail_data.price }}">
                                                                     <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td>{{ size }}</td>
                                                                     <td>{{ count }}</td>
@@ -74,7 +75,7 @@
 
                                                             {% for size, count in detail_data.h_list.items %}
                                                                 {% if size != 0 and size != "0" and count != 0 %}
-                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-translated-name="{{ detail_name|get_or_self:replace_dict }}" data-detail-price="{{ detail_data.price }}">
+                                                                <tr class="detail-row" data-detail-name="{{ detail_name }}" data-detail-display-name="{{ detail_name|get_or_self:replace_dict }}" data-detail-price="{{ detail_data.price }}">
                                                                     <td class="cell-name">{{ detail_name|get_or_self:replace_dict }}</td>
                                                                     <td>{{ size }}</td>
                                                                     <td>{{ count }}</td>
@@ -100,15 +101,16 @@
         {% if glukhars %}
         <div class="tab-pane fade {% if not portals %}show active{% endif %}" id="glukhars-pane" role="tabpanel" aria-labelledby="glukhars-tab">
             {% for product in glukhars %}
-                <h4 class="mt-4 product-header" data-product-id="glukhar-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                <h4 class="mt-4 product-header" data-product-id="glukhar-{{ product.id }}" data-amount="{{ product.amount }}" data-area="{{ product.calculation_details.area }}">
                     Глухарь (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
-                    <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                    <span class="fs-6 fw-normal text-muted product-area-display">| Площадь 1 шт: {{ product.calculation_details.area }} м²{% if product.amount > 1 %} (Общая: {% widthratio product.calculation_details.area 1 product.amount %} м²){% endif %}</span>
                 </h4>
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body p-0">
                         <div class="table-responsive">
                             <table class="table table-bordered table-hover mb-0 align-middle export-table"
-                                   data-sheet-name="Глухарь_{{ product.id }}">
+                                   data-sheet-name="Глухарь_{{ product.id }}"
+                                   data-amount="{{ product.amount }}">
                                 <thead class="table-dark">
                                     <tr>
                                         <th>Наименование</th>
@@ -167,25 +169,8 @@
 <script src="{% static 'js/xlsx.full.min.js' %}"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Подсчет и вывод площади
-        document.querySelectorAll('.product-header').forEach(function(header) {
-            const w = parseFloat(header.getAttribute('data-width')) || 0;
-            const h = parseFloat(header.getAttribute('data-height')) || 0;
-            const amount = parseInt(header.getAttribute('data-amount')) || 1;
-            
-            const area = (w * h) / 1000000;
-            const totalProductArea = area * amount;
-            
-            let areaText = ` | Площадь 1 шт: ${area.toFixed(2)} м²`;
-            if (amount > 1) {
-                areaText += ` (Общая: ${totalProductArea.toFixed(2)} м²)`;
-            }
-            
-            const display = header.querySelector('.product-area-display');
-            if (display) {
-                display.textContent = areaText;
-            }
-        });
+        // Площадь 1 шт. уже посчитана на бэкенде (calculation_details.area)
+        // и выведена прямо в шаблоне — здесь пересчитывать ее не нужно.
 
         // Объединение повторяющихся ВИД через rowspan
         document.querySelectorAll(".main-table").forEach(function(table) {
@@ -267,7 +252,7 @@
                 const groups = new Map();
                 rows.forEach(row => {
                     // ТЕПЕРЬ БЕРЕМ ПЕРЕВЕДЕННОЕ НАЗВАНИЕ
-                    const name = row.getAttribute("data-translated-name") || row.getAttribute("data-detail-name");
+                    const name = row.getAttribute("data-detail-display-name") || row.getAttribute("data-detail-name");
                     if (!name) return;
                     const cells = row.querySelectorAll("td");
                     if (cells.length < 2) return;
@@ -314,7 +299,7 @@
             }
 
             // Добавляем отступ и количество товара снизу таблицы
-            const quantity = table.dataset.portalN || table.dataset.glukharN || "1";
+            const quantity = table.dataset.amount || "1";
             rowsData.push(["", "", ""]); // Пустая строка для отступа
             rowsData.push(["Количество товара:", "", quantity]);
 

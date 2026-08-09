@@ -70,7 +70,7 @@
                     <div class="row g-3">
                         <div class="col-md-6">
                             <label class="form-label fw-bold">🌲 Материал:</label>
-                            <select name="material" id="glukharMaterial" class="form-select">
+                            <select id="glukharMaterial" class="form-select" required>
                                 <option value="сосна">Сосна</option>
                                 <option value="дуб">Дуб</option>
                                 <option value="лиственница">Лиственница</option>
@@ -78,7 +78,7 @@
                         </div>
                         <div class="col-md-6">
                             <label class="form-label fw-bold">🖌 Покраска:</label>
-                            <select name="color" id="glukharColor" class="form-select">
+                            <select id="glukharColor" class="form-select" required>
                                 <option value="RAL">RAL</option>
                                 <option value="Лесс">Лесс</option>
                             </select>
@@ -194,11 +194,11 @@
 </template>
 
 <template id="glukharCardTemplate">
-    <div class="col-md-6 col-lg-4 mb-3 glukhar-card-wrapper">
+    <div class="col-md-6 col-lg-4 mb-4 glukhar-card-wrapper">
         <div class="card h-100 shadow-sm glukhar-card border-secondary">
-            <div class="card-header d-flex justify-content-between align-items-center bg-light">
+            <div class="card-header d-flex justify-content-between align-items-center bg-dark text-white">
                 <span class="fw-bold glukhar-title">Глухарь #1</span>
-                <button type="button" class="btn-close btn-close-sm remove-glukhar-btn" aria-label="Удалить" title="Удалить эту позицию"></button>
+                <button type="button" class="btn-close btn-close-white remove-glukhar-btn" aria-label="Удалить" title="Удалить эту позицию"></button>
             </div>
             <div class="card-body">
                 <div class="row g-2">
@@ -255,7 +255,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
     const isAdmin = {{ is_admin|yesno:"true,false" }};
     const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
-    let lastGrandTotal = 0;
 
     const form = document.getElementById('orderForm');
     const buyerSelect = document.getElementById('buyerSelect');
@@ -277,7 +276,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const saveOrderBtn = document.getElementById('saveOrderBtn');
     const downloadKpBtn = document.getElementById('downloadKpBtn');
 
-    const TOTAL_STEPS = 4;
     let currentStep = 1;
     let portalIdCounter = 0;
     let glukharIdCounter = 0;
@@ -287,12 +285,14 @@ document.addEventListener('DOMContentLoaded', function () {
     let glukharsPayload = [];
     let portalCalcResult = null;
     let glukharCalcResult = null;
+    let portalArea = 0;
+    let glukharArea = 0;
+    let baseTotalPrice = 0;
+    let lastGrandTotal = 0;
     let savedOrderId = null;
     // Шаблон ссылки на скачивание КП с плейсхолдером id=0, который
     // подменяем на реальный order_id после сохранения заказа.
     const downloadKpUrlTemplate = "{% url 'orders:download_kp' 0 %}";
-    let portalArea = 0;
-    let glukharArea = 0;
 
     // ---------- Вспомогательные функции ----------
     function showAlert(message, type = 'danger') {
@@ -316,36 +316,64 @@ document.addEventListener('DOMContentLoaded', function () {
         return document.querySelector('[name=csrfmiddlewaretoken]').value;
     }
 
-    // Загрузка покупателей
-    fetch('{% url "users:api_buyers_list" %}')
-        .then(res => res.json())
-        .then(buyers => {
-            buyers.forEach(b => {
-                const opt = document.createElement('option');
-                opt.value = b.id;
-                let name = `${b.first_name || ''} ${b.last_name || ''}`.trim() || 'Без имени';
-                opt.textContent = `${name} (${b.phone || b.email || 'Нет контактов'})`;
-                buyerSelect.appendChild(opt);
+    function loadBuyerOptions() {
+        fetch('{% url "users:api_buyers_list" %}')
+            .then(res => res.json())
+            .then(buyers => {
+                buyers.forEach(buyer => {
+                    const option = document.createElement('option');
+                    option.value = buyer.id;
+                    let name = `${buyer.first_name || ''} ${buyer.last_name || ''}`.trim() || 'Без имени';
+                    if (name.length > 25) {
+                        name = name.substring(0, 25) + '...';
+                    }
+                    option.textContent = `${name} (${buyer.phone || buyer.email || 'Нет контактов'})`;
+                    buyerSelect.appendChild(option);
+                });
             });
-        });
+    }
+
+    loadBuyerOptions();
 
     buyerSelect.addEventListener('change', function () {
         newBuyerFields.style.display = this.value === 'new' ? 'block' : 'none';
     });
 
     // ---------- Шаг "Порталы": карточки ----------
+    function updateSchemeItemSelectionStyle(item, radio) {
+        if (radio.disabled) return;
+        item.classList.toggle('border-success', radio.checked);
+        item.classList.toggle('shadow-sm', radio.checked);
+        item.classList.toggle('bg-white', radio.checked);
+        item.classList.toggle('border-dark', !radio.checked);
+    }
+
+    function updateSchemeVisualSelection(cardWrapper) {
+        cardWrapper.querySelectorAll('.scheme-item').forEach(item => {
+            updateSchemeItemSelectionStyle(item, item.querySelector('.scheme-radio'));
+        });
+    }
+
     function updateCardSchemesAvailability(cardWrapper) {
         const width = parseInt(cardWrapper.querySelector('.p-width').value) || 0;
+
         cardWrapper.querySelectorAll('.scheme-item').forEach(item => {
             const min = parseInt(item.getAttribute('data-min'));
             const max = parseInt(item.getAttribute('data-max'));
             const radio = item.querySelector('.scheme-radio');
             const inRange = width >= min && width <= max;
+
             radio.disabled = !inRange;
-            if (!inRange && radio.checked) radio.checked = false;
+            if (!inRange && radio.checked) {
+                radio.checked = false;
+            }
+
             item.classList.toggle('opacity-50', !inRange);
             item.classList.toggle('bg-light', !inRange);
+            item.classList.toggle('border-secondary', !inRange);
             item.style.pointerEvents = inRange ? 'auto' : 'none';
+
+            updateSchemeItemSelectionStyle(item, radio);
         });
     }
 
@@ -353,7 +381,9 @@ document.addEventListener('DOMContentLoaded', function () {
         portalIdCounter++;
         const clone = portalTemplate.content.cloneNode(true);
         const cardWrapper = clone.querySelector('.portal-card-wrapper');
-        cardWrapper.querySelector('.portal-title').textContent = `Портал #${portalIdCounter}`;
+        const cardIndex = portalIdCounter;
+
+        cardWrapper.querySelector('.portal-title').textContent = `Портал #${cardIndex}`;
 
         cardWrapper.querySelector('.remove-portal-btn').addEventListener('click', function () {
             cardWrapper.remove();
@@ -366,14 +396,19 @@ document.addEventListener('DOMContentLoaded', function () {
             schemeItem.className = 'col-sm-6 scheme-item p-2 border rounded text-center d-flex flex-column justify-content-center align-items-center position-relative border-dark';
             schemeItem.setAttribute('data-min', scheme.min_size);
             schemeItem.setAttribute('data-max', scheme.max_size);
+            schemeItem.style.transition = 'all 0.2s ease';
             schemeItem.style.cursor = 'pointer';
+            schemeItem.style.minHeight = '75px';
             schemeItem.innerHTML = `
-                <input type="radio" name="scheme_radio_${portalIdCounter}" value="${scheme.name}" class="form-check-input scheme-radio position-absolute top-0 start-0 m-2" required>
+                <input type="radio" name="scheme_radio_${cardIndex}" value="${scheme.name}" class="form-check-input scheme-radio position-absolute top-0 start-0 m-2" required>
                 <span class="fw-bold small text-dark">Схема ${scheme.name}</span>
                 <span class="text-muted" style="font-size: 0.75rem;">${scheme.min_size} - ${scheme.max_size} мм</span>`;
-            schemeItem.addEventListener('click', () => {
+            schemeItem.addEventListener('click', function () {
                 const radio = schemeItem.querySelector('.scheme-radio');
-                if (!radio.disabled) radio.checked = true;
+                if (!radio.disabled) {
+                    radio.checked = true;
+                    updateSchemeVisualSelection(cardWrapper);
+                }
             });
             schemesContainer.appendChild(schemeItem);
         });
@@ -390,20 +425,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     addPortalBtn.addEventListener('click', addPortalCard);
-    addGlukharBtn.addEventListener('click', addGlukharCard);
-
-    saveOrderBtn.addEventListener('click', function () {
-        saveOrder(this);
-    });
-
-    downloadKpBtn.addEventListener('click', function () {
-        downloadKp();
-    });
-
-    function downloadKp() {
-        if (!savedOrderId) return;
-        window.location.href = downloadKpUrlTemplate.replace('/0/', `/${savedOrderId}/`);
-    }
 
     // ---------- Шаг "Глухари": карточки ----------
     function addGlukharCard() {
@@ -426,10 +447,12 @@ document.addEventListener('DOMContentLoaded', function () {
         });
     }
 
+    addGlukharBtn.addEventListener('click', addGlukharCard);
+
     // ---------- Сбор данных с шагов ----------
     function collectPortals() {
         const cards = portalContainer.querySelectorAll('.portal-card-wrapper');
-        const result = [];
+        const portals = [];
         portalArea = 0;
 
         for (const [index, card] of cards.entries()) {
@@ -448,46 +471,53 @@ document.addEventListener('DOMContentLoaded', function () {
                 return { error: `Заполните все поля и выберите схему для портала #${index + 1}.` };
             }
 
-            result.push({
+            portals.push({
                 name: `portal_${index}`,
-                width, height, amount,
+                width,
+                height,
+                amount,
                 has_rain: hasRain,
                 wood_type: woodType,
-                color, hardware, glazing,
+                color,
+                hardware,
+                glazing,
                 scheme: schemeRadio.value,
                 hardware_color: hardwareColor,
             });
             portalArea += (width * height / 1_000_000) * amount;
         }
-        return { portals: result };
+        return { portals };
     }
 
     function collectGlukhars() {
         const material = document.getElementById('glukharMaterial').value;
         const color = document.getElementById('glukharColor').value;
         const cards = glukharContainer.querySelectorAll('.glukhar-card-wrapper');
-        const result = [];
+        const glukhars = [];
         glukharArea = 0;
 
         for (const [index, card] of cards.entries()) {
             const width = parseFloat(card.querySelector('.g-width').value);
             const height = parseFloat(card.querySelector('.g-height').value);
             const amount = parseInt(card.querySelector('.g-amount').value);
-            const isNotRect = card.querySelector('.g-not-rect').checked;
+            const isNotRectangle = card.querySelector('.g-not-rect').checked;
 
             if (!width || !height || !amount) {
                 return { error: `Заполните ширину, высоту и количество для глухаря #${index + 1}.` };
             }
 
-            result.push({
+            glukhars.push({
                 name: `glukhar_${index}`,
-                width, height, amount,
-                is_not_rectangle: isNotRect,
-                material, color,
+                width,
+                height,
+                amount,
+                is_not_rectangle: isNotRectangle,
+                material,
+                color,
             });
             glukharArea += (width * height / 1_000_000) * amount;
         }
-        return { glukhars: result };
+        return { glukhars };
     }
 
     // ---------- Расчет (шаг 4) ----------
@@ -534,29 +564,32 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    // ---------- Отображение результатов ----------
     function renderResults() {
         const portalTotalWithRatio = portalCalcResult ? (parseFloat(portalCalcResult['total_with_ratio']) || 0) : 0;
         const glukharTotalWithRatio = glukharCalcResult ? (parseFloat(glukharCalcResult['total_with_ratio']) || 0) : 0;
+        baseTotalPrice = portalTotalWithRatio + glukharTotalWithRatio;
 
         let html = '<h3 class="mb-3 border-bottom pb-2">Результаты расчета</h3>';
 
         if (portalsPayload.length) {
             html += '<h5 class="mt-3">Порталы</h5><div class="row g-3 mb-3">';
-            portalsPayload.forEach((p, index) => {
-                const total = portalCalcResult[p.name].total_with_ratio;
-                const area = (p.height * p.width / 1_000_000 * p.amount).toFixed(2);;
+            portalsPayload.forEach((portal, index) => {
+                const portalResult = portalCalcResult[portal.name] || {};
+                const portalTotal = portalResult.total_with_ratio || 0;
+                const area = (portal.height * portal.width / 1_000_000 * portal.amount).toFixed(2);
                 html += `<div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm border-secondary">
                         <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between">
-                            <span>Портал #${index + 1}</span><span class="badge bg-primary">x${p.amount} шт.</span>
+                            <span>Портал #${index + 1}</span><span class="badge bg-primary">x${portal.amount} шт.</span>
                         </div>
                         <div class="card-body p-0">
                             <table class="table table-sm table-bordered mb-0 text-center align-middle">
                                 <tbody>
-                                    <tr><td class="text-start ps-2 small">Схема / Дерево</td><td class="small">${p.scheme} / ${p.wood_type}</td></tr>
-                                    <tr><td class="text-start ps-2 small">Размер</td><td class="small">${p.width} x ${p.height} мм</td></tr>
+                                    <tr><td class="text-start ps-2 small">Схема / Дерево</td><td class="small">${portal.scheme} / ${portal.wood_type}</td></tr>
+                                    <tr><td class="text-start ps-2 small">Размер</td><td class="small">${portal.width} x ${portal.height} мм</td></tr>
                                     <tr><td class="text-start ps-2 small">Общая площадь</td><td class="small">${area} м²</td></tr>
-                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${total} руб</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${portalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -568,20 +601,21 @@ document.addEventListener('DOMContentLoaded', function () {
 
         if (glukharsPayload.length) {
             html += '<h5 class="mt-3">Глухари</h5><div class="row g-3 mb-3">';
-            glukharsPayload.forEach((g, index) => {
-                const total = glukharCalcResult[g.name].total_with_ratio;
-                const area = (g.height * g.width / 1_000_000 * g.amount).toFixed(2);;
+            glukharsPayload.forEach((glukhar, index) => {
+                const glukharResult = glukharCalcResult[glukhar.name] || {};
+                const glukharTotal = glukharResult.total_with_ratio || 0;
+                const area = (glukhar.height * glukhar.width / 1_000_000 * glukhar.amount).toFixed(2);
                 html += `<div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm border-secondary">
                         <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between">
-                            <span>Глухарь #${index + 1}</span><span class="badge bg-primary">x${g.amount} шт.</span>
+                            <span>Глухарь #${index + 1}</span><span class="badge bg-primary">x${glukhar.amount} шт.</span>
                         </div>
                         <div class="card-body p-0">
                             <table class="table table-sm table-bordered mb-0 text-center align-middle">
                                 <tbody>
-                                    <tr><td class="text-start ps-2 small">Размер</td><td class="small">${g.width} x ${g.height} мм</td></tr>
+                                    <tr><td class="text-start ps-2 small">Размер</td><td class="small">${glukhar.width} x ${glukhar.height} мм</td></tr>
                                     <tr><td class="text-start ps-2 small">Общая площадь</td><td class="small">${area} м²</td></tr>
-                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${total} руб</td></tr>
+                                    <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${glukharTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб</td></tr>
                                 </tbody>
                             </table>
                         </div>
@@ -592,9 +626,9 @@ document.addEventListener('DOMContentLoaded', function () {
         }
 
         html += `
-        <div class="card mb-4 bg-light shadow-sm">
+        <div class="card mb-4 bg-light shadow-sm border-secondary">
             <div class="card-body">
-                <h5 class="card-title fw-bold mb-3">Дополнительные параметры заказа</h5>
+                <h5 class="card-title fw-bold mb-3">🚚 Дополнительные параметры заказа</h5>
                 <div class="row g-3">
                     <div class="col-lg col-md-4">
                         <label class="form-label fw-bold small">Монтаж (руб/м²)</label>
@@ -608,12 +642,12 @@ document.addEventListener('DOMContentLoaded', function () {
                         <label class="form-label fw-bold small">Разгрузка (руб)</label>
                         <input type="number" class="form-control cost-input" id="unloadingCost" min="0" value="50000">
                     </div>
-                    <div class="col-lg col-md-6">
+                    <div class="col-lg col-md-4">
                         <label class="form-label fw-bold text-danger small">Скидка (руб)</label>
                         <input type="number" class="form-control cost-input" id="discountRate" min="0" value="0">
                     </div>
                 </div>
-                <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0 d-flex flex-wrap justify-content-center align-items-center gap-3">
+                <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0 border-dark shadow-sm d-flex flex-wrap justify-content-center align-items-center gap-3">
                     <span id="dynamicGrandTotal"></span>
                     ${isAdmin ? '' : `<span id="dealerPercentageBlock" class="border-start ps-3"></span>`}
                 </div>
@@ -621,38 +655,42 @@ document.addEventListener('DOMContentLoaded', function () {
         </div>`;
 
         resultsContainer.innerHTML = html;
-        lastGrandTotal = 0;
 
-        function recalcGrandTotal() {
-            const installRate = parseFloat(document.getElementById('installRate').value) || 0;
-            const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
-            const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
-            const discount = parseFloat(document.getElementById('discountRate').value) || 0;
-
-            // Округляем сумму до 3 знаков после запятой и превращаем обратно в число
-            const totalArea = Number((portalArea + glukharArea).toFixed(2));
-            const finalTotal = portalTotalWithRatio + glukharTotalWithRatio +
-                + (totalArea * installRate) + delivery + unloading - discount;
-
-            lastGrandTotal = finalTotal;
-            document.getElementById('dynamicGrandTotal').textContent =
-                `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
-
-            if (!isAdmin) {
-                const dealerAmount = Math.round(dealerPercentage / 100 * finalTotal);
-                const dealerBlock = document.getElementById('dealerPercentageBlock');
-                if (dealerBlock) {
-                    dealerBlock.textContent = `Процент дилера (${dealerPercentage}%): ${dealerAmount.toLocaleString('ru-RU')} руб.`;
-                }
-            }
-        }
-
-        document.querySelectorAll('.cost-input').forEach(inp => inp.addEventListener('input', recalcGrandTotal));
-        recalcGrandTotal();
+        document.querySelectorAll('.cost-input').forEach(input => input.addEventListener('input', recalculateGrandTotal));
+        recalculateGrandTotal();
     }
 
+    function recalculateGrandTotal() {
+        const installRate = parseFloat(document.getElementById('installRate').value) || 0;
+        const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
+        const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
+        const discount = parseFloat(document.getElementById('discountRate').value) || 0;
+        const totalArea = Number((portalArea + glukharArea).toFixed(2));
+
+        lastGrandTotal = baseTotalPrice + (totalArea * installRate) + delivery + unloading - discount;
+
+        document.getElementById('dynamicGrandTotal').textContent =
+            `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${lastGrandTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
+
+        if (!isAdmin) {
+            const dealerAmount = Math.round(dealerPercentage / 100 * lastGrandTotal);
+            const dealerBlock = document.getElementById('dealerPercentageBlock');
+            if (dealerBlock) {
+                dealerBlock.textContent = `Процент дилера (${dealerPercentage}%): ${dealerAmount.toLocaleString('ru-RU')} руб.`;
+            }
+        }
+    }
+
+    function downloadKp() {
+        if (!savedOrderId) return;
+        window.location.href = downloadKpUrlTemplate.replace('/0/', `/${savedOrderId}/`);
+    }
+
+    downloadKpBtn.addEventListener('click', downloadKp);
+
+    // ---------- Сохранение заказа ----------
     async function saveOrder(btnElement) {
-        const config = {
+        const payload = {
             buyer_id: buyerSelect.value,
             installation: parseFloat(document.getElementById('installRate').value) || 0,
             delivery: parseFloat(document.getElementById('deliveryCost').value) || 0,
@@ -664,7 +702,7 @@ document.addEventListener('DOMContentLoaded', function () {
         };
 
         if (buyerSelect.value === 'new') {
-            config.buyer_data = {
+            payload.buyer_data = {
                 first_name: document.getElementById('buyerFirstName').value,
                 last_name: document.getElementById('buyerLastName').value,
                 phone: document.getElementById('buyerPhone').value,
@@ -672,8 +710,8 @@ document.addEventListener('DOMContentLoaded', function () {
             };
         }
 
-        const payload = {
-            config,
+        const requestBody = {
+            config: payload,
             calculations: {
                 portals: portalCalcResult || {},
                 glukhars: glukharCalcResult || {},
@@ -687,7 +725,7 @@ document.addEventListener('DOMContentLoaded', function () {
             const response = await fetch('{% url "orders:combined_order_save" %}', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
-                body: JSON.stringify(payload),
+                body: JSON.stringify(requestBody),
             });
             const data = await response.json();
             if (data.status === 'success') {
@@ -708,6 +746,10 @@ document.addEventListener('DOMContentLoaded', function () {
         }
     }
 
+    saveOrderBtn.addEventListener('click', function () {
+        saveOrder(this);
+    });
+
     // ---------- Навигация по визарду ----------
     function goToStep(step) {
         currentStep = step;
@@ -717,9 +759,9 @@ document.addEventListener('DOMContentLoaded', function () {
         });
 
         document.querySelectorAll('.step-indicator').forEach(indicator => {
-            const s = parseInt(indicator.dataset.step);
-            indicator.classList.toggle('active', s === step);
-            indicator.classList.toggle('done', s < step);
+            const indicatorStep = parseInt(indicator.dataset.step);
+            indicator.classList.toggle('active', indicatorStep === step);
+            indicator.classList.toggle('done', indicatorStep < step);
         });
 
         // Гарантируем, что на шагах "Порталы"/"Глухари" всегда есть хотя бы одна

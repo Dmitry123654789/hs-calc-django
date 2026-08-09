@@ -1033,12 +1033,42 @@ def calculate_beams(
 
     portal_total_with_ratio = money(portal_total * scheme_ratio)
 
+    # Единые для порталов и глухарей поля-агрегаты за 1 шт. изделия:
+    # площадь и суммарная стоимость материалов/работы без учета
+    # количества и коэффициента. Считаются один раз здесь, чтобы
+    # фронтенду не приходилось пересчитывать их из DOM/JSON.
+    materials_total_raw = ZERO
+    labor_total_raw = ZERO
+
+    for detail_name, detail_value in workpiece[scheme].items():
+        if not (isinstance(detail_value, dict) and "price" in detail_value):
+            continue
+
+        detail_price = to_decimal(detail_value["price"])
+
+        if detail_name in ("labor_carpenter", "labor_painter"):
+            labor_total_raw += detail_price
+        else:
+            materials_total_raw += detail_price
+
+    area = dec_round(to_decimal(width) * to_decimal(height) / MILLION, 2)
+    materials_total = money(materials_total_raw)
+    labor_total = money(labor_total_raw)
+    amount_dec = to_decimal(amount)
+    materials_total_all = money(materials_total_raw * amount_dec)
+    labor_total_all = money(labor_total_raw * amount_dec)
+
     return (
         workpiece,
         work_data,
         portal_total,
         scheme_ratio,
         portal_total_with_ratio,
+        area,
+        materials_total,
+        labor_total,
+        materials_total_all,
+        labor_total_all,
     )
 
 
@@ -1054,6 +1084,11 @@ def calculate_portals(portals: list) -> dict:
             portal_total,
             scheme_ratio,
             portal_total_with_ratio,
+            area,
+            materials_total,
+            labor_total,
+            materials_total_all,
+            labor_total_all,
         ) = calculate_beams(**portal)
 
         result[portal["name"]] = {
@@ -1064,6 +1099,11 @@ def calculate_portals(portals: list) -> dict:
             "total": portal_total,
             "ratio": scheme_ratio,
             "total_with_ratio": portal_total_with_ratio,
+            "area": area,
+            "materials_total": materials_total,
+            "labor_total": labor_total,
+            "materials_total_all": materials_total_all,
+            "labor_total_all": labor_total_all,
         }
 
         total_price += to_decimal(portal_total)
@@ -1225,6 +1265,16 @@ def calculate_glukhar(glukhar_data: list, ratio) -> dict:
         item_total_amount = money(item_total * amount_dec)
         item_total_with_ratio = money(item_total_amount * ratio_dec)
 
+        # Те же единые поля-агрегаты за 1 шт., что и у порталов
+        # (см. calculate_beams): площадь и стоимость материалов/работы
+        # без учета количества и коэффициента, плюс те же суммы,
+        # уже умноженные на количество (materials_total_all/labor_total_all).
+        item_area = dec_round(area, 2)
+        materials_total = money(get_all_price(materials))
+        labor_total = money(get_all_price(labor))
+        materials_total_all = money(materials_total * amount_dec)
+        labor_total_all = money(labor_total * amount_dec)
+
         result[name] = {
             "type": "glukhar",
             "amount": amount,
@@ -1233,6 +1283,11 @@ def calculate_glukhar(glukhar_data: list, ratio) -> dict:
             "total": item_total_amount,
             "ratio": ratio_dec,
             "total_with_ratio": item_total_with_ratio,
+            "area": item_area,
+            "materials_total": materials_total,
+            "labor_total": labor_total,
+            "materials_total_all": materials_total_all,
+            "labor_total_all": labor_total_all,
         }
 
         total_price += item_total_amount

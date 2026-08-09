@@ -9,7 +9,7 @@
 
     <form id="portalForm">
         {% csrf_token %}
-        
+
         <div class="card mb-4 bg-light shadow-sm">
             <div class="card-body">
                 <div class="row g-3">
@@ -20,7 +20,7 @@
                             <option value="new">+ Новый покупатель</option>
                         </select>
                     </div>
-                    
+
                     <div class="col-12" id="newBuyerFields" style="display: none;">
                         <div class="row g-2">
                             <div class="col-md-3"><input type="text" id="buyerFirstName" class="form-control" placeholder="Имя"></div>
@@ -132,113 +132,126 @@
 
 {% block scripts %}
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
+    document.addEventListener('DOMContentLoaded', function () {
         const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
         const isAdmin = {{ is_admin|yesno:"true,false" }};
         const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
-        let lastGrandTotal = 0;
-        
-        const container = document.getElementById('portalContainer');
-        const template = document.getElementById('portalCardTemplate');
-        const addBtn = document.getElementById('addPortalBtn');
+
         const form = document.getElementById('portalForm');
-        const resultContainer = document.getElementById('resultsContainer');
         const buyerSelect = document.getElementById('buyerSelect');
         const newBuyerFields = document.getElementById('newBuyerFields');
-        let lastCalculationResult = null;
-        
+
+        const portalContainer = document.getElementById('portalContainer');
+        const portalTemplate = document.getElementById('portalCardTemplate');
+        const addPortalBtn = document.getElementById('addPortalBtn');
+
+        const resultsContainer = document.getElementById('resultsContainer');
+
         let portalIdCounter = 0;
-        let lastPayload = null;
+        let portalsPayload = [];
+        let portalCalcResult = null;
+        let portalArea = 0;
         let baseTotalPrice = 0;
-        let totalArea = 0;
+        let lastGrandTotal = 0;
         let savedOrderId = null;
         // Шаблон ссылки на скачивание КП с плейсхолдером id=0, который
         // подменяем на реальный order_id после сохранения заказа.
         const downloadKpUrlTemplate = "{% url 'orders:download_kp' 0 %}";
 
+        // ---------- Вспомогательные функции ----------
         function showAlert(message, type = 'danger') {
             document.querySelectorAll('.custom-alert').forEach(el => el.remove());
             const alertDiv = document.createElement('div');
             alertDiv.className = `alert alert-${type} mt-4 custom-alert alert-dismissible fade show shadow-sm`;
-            alertDiv.innerHTML = `<strong>${type === 'danger' ? 'Ошибка!' : 'Внимание!'}</strong> ${message}<button type="button" class="btn-close" data-bs-dismiss="alert"></button>`;
+            alertDiv.role = 'alert';
+            alertDiv.innerHTML = `
+                <strong>${type === 'danger' ? 'Ошибка!' : 'Внимание!'}</strong> ${message}
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            `;
             document.querySelector('.container').insertBefore(alertDiv, document.querySelector('.container').children[1]);
+            alertDiv.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            setTimeout(() => {
+                alertDiv.classList.remove('show');
+                setTimeout(() => alertDiv.remove(), 150);
+            }, 10000);
         }
 
-        // Загрузка покупателей
-        fetch('{% url "users:api_buyers_list" %}')
-            .then(res => res.json())
-            .then(buyers => {
-                buyers.forEach(b => {
-                    const opt = document.createElement('option');
-                    opt.value = b.id;
-                    opt.textContent = `${b.first_name || 'Без имени'} ${b.last_name || ''} (${b.phone || b.email || 'Нет контактов'})`;
-                    buyerSelect.appendChild(opt);
-                });
-            });
+        function getCsrfToken() {
+            return document.querySelector('[name=csrfmiddlewaretoken]').value;
+        }
 
-        buyerSelect.addEventListener('change', function() {
+        function loadBuyerOptions() {
+            fetch('{% url "users:api_buyers_list" %}')
+                .then(res => res.json())
+                .then(buyers => {
+                    buyers.forEach(buyer => {
+                        const option = document.createElement('option');
+                        option.value = buyer.id;
+                        let name = `${buyer.first_name || ''} ${buyer.last_name || ''}`.trim() || 'Без имени';
+                        if (name.length > 25) {
+                            name = name.substring(0, 25) + '...';
+                        }
+                        option.textContent = `${name} (${buyer.phone || buyer.email || 'Нет контактов'})`;
+                        buyerSelect.appendChild(option);
+                    });
+                });
+        }
+
+        loadBuyerOptions();
+
+        buyerSelect.addEventListener('change', function () {
             newBuyerFields.style.display = this.value === 'new' ? 'block' : 'none';
         });
 
-        function updateCardSchemesAvailability(cardWrapper) {
-            const widthInput = cardWrapper.querySelector('.p-width');
-            const width = parseInt(widthInput.value) || 0;
-            const items = cardWrapper.querySelectorAll('.scheme-item');
-
-            items.forEach(item => {
-                const min = parseInt(item.getAttribute('data-min'));
-                const max = parseInt(item.getAttribute('data-max'));
-                const radio = item.querySelector('.scheme-radio');
-
-                if (width >= min && width <= max) {
-                    radio.disabled = false;
-                    item.classList.remove('opacity-50', 'bg-light', 'border-secondary');
-                    if (radio.checked) {
-                        item.classList.add('border-success', 'bg-white', 'shadow-sm');
-                    } else {
-                        item.classList.add('border-dark');
-                        item.classList.remove('border-success', 'shadow-sm');
-                    }
-                    item.style.pointerEvents = 'auto';
-                } else {
-                    radio.disabled = true;
-                    if (radio.checked) {
-                        radio.checked = false;
-                    }
-                    item.classList.remove('border-success', 'border-dark', 'shadow-sm');
-                    item.classList.add('opacity-50', 'bg-light', 'border-secondary');
-                    item.style.pointerEvents = 'none';
-                }
-            });
+        // ---------- Карточки порталов ----------
+        function updateSchemeItemSelectionStyle(item, radio) {
+            if (radio.disabled) return;
+            item.classList.toggle('border-success', radio.checked);
+            item.classList.toggle('shadow-sm', radio.checked);
+            item.classList.toggle('bg-white', radio.checked);
+            item.classList.toggle('border-dark', !radio.checked);
         }
 
         function updateSchemeVisualSelection(cardWrapper) {
-            const items = cardWrapper.querySelectorAll('.scheme-item');
-            items.forEach(item => {
+            cardWrapper.querySelectorAll('.scheme-item').forEach(item => {
+                updateSchemeItemSelectionStyle(item, item.querySelector('.scheme-radio'));
+            });
+        }
+
+        function updateCardSchemesAvailability(cardWrapper) {
+            const width = parseInt(cardWrapper.querySelector('.p-width').value) || 0;
+
+            cardWrapper.querySelectorAll('.scheme-item').forEach(item => {
+                const min = parseInt(item.getAttribute('data-min'));
+                const max = parseInt(item.getAttribute('data-max'));
                 const radio = item.querySelector('.scheme-radio');
-                if (!radio.disabled) {
-                    if (radio.checked) {
-                        item.classList.remove('border-dark');
-                        item.classList.add('border-success', 'shadow-sm', 'bg-white');
-                    } else {
-                        item.classList.remove('border-success', 'shadow-sm');
-                        item.classList.add('border-dark');
-                    }
+                const inRange = width >= min && width <= max;
+
+                radio.disabled = !inRange;
+                if (!inRange && radio.checked) {
+                    radio.checked = false;
                 }
+
+                item.classList.toggle('opacity-50', !inRange);
+                item.classList.toggle('bg-light', !inRange);
+                item.classList.toggle('border-secondary', !inRange);
+                item.style.pointerEvents = inRange ? 'auto' : 'none';
+
+                updateSchemeItemSelectionStyle(item, radio);
             });
         }
 
         function addPortalCard() {
             portalIdCounter++;
-            const clone = template.content.cloneNode(true);
+            const clone = portalTemplate.content.cloneNode(true);
             const cardWrapper = clone.querySelector('.portal-card-wrapper');
-            const currentCardIndex = portalIdCounter;
-            
-            cardWrapper.querySelector('.portal-title').textContent = `Портал #${currentCardIndex}`;
-            
-            cardWrapper.querySelector('.remove-portal-btn').addEventListener('click', function() {
+            const cardIndex = portalIdCounter;
+
+            cardWrapper.querySelector('.portal-title').textContent = `Портал #${cardIndex}`;
+
+            cardWrapper.querySelector('.remove-portal-btn').addEventListener('click', function () {
                 cardWrapper.remove();
-                renumberCards();
+                renumberPortalCards();
             });
 
             const schemesContainer = cardWrapper.querySelector('.p-schemes-container');
@@ -250,14 +263,13 @@
                 schemeItem.style.transition = 'all 0.2s ease';
                 schemeItem.style.cursor = 'pointer';
                 schemeItem.style.minHeight = '75px';
-
                 schemeItem.innerHTML = `
-                    <input type="radio" name="scheme_radio_${currentCardIndex}" value="${scheme.name}" class="form-check-input scheme-radio position-absolute top-0 start-0 m-2" required>
+                    <input type="radio" name="scheme_radio_${cardIndex}" value="${scheme.name}" class="form-check-input scheme-radio position-absolute top-0 start-0 m-2" required>
                     <span class="fw-bold small text-dark">Схема ${scheme.name}</span>
                     <span class="text-muted" style="font-size: 0.75rem;">${scheme.min_size} - ${scheme.max_size} мм</span>
                 `;
 
-                schemeItem.addEventListener('click', function() {
+                schemeItem.addEventListener('click', function () {
                     const radio = schemeItem.querySelector('.scheme-radio');
                     if (!radio.disabled) {
                         radio.checked = true;
@@ -268,123 +280,126 @@
                 schemesContainer.appendChild(schemeItem);
             });
 
-            const widthInput = cardWrapper.querySelector('.p-width');
-            widthInput.addEventListener('input', () => updateCardSchemesAvailability(cardWrapper));
-            
-            container.appendChild(cardWrapper);
+            cardWrapper.querySelector('.p-width').addEventListener('input', () => updateCardSchemesAvailability(cardWrapper));
+
+            portalContainer.appendChild(cardWrapper);
             updateCardSchemesAvailability(cardWrapper);
         }
 
-        function renumberCards() {
-            const cards = container.querySelectorAll('.portal-card-wrapper');
-            cards.forEach((card, index) => {
+        function renumberPortalCards() {
+            portalContainer.querySelectorAll('.portal-card-wrapper').forEach((card, index) => {
                 card.querySelector('.portal-title').textContent = `Портал #${index + 1}`;
             });
         }
 
         addPortalCard();
-        addBtn.addEventListener('click', addPortalCard);
+        addPortalBtn.addEventListener('click', addPortalCard);
 
-        form.addEventListener('submit', function(e) {
-            e.preventDefault();
+        // ---------- Сбор данных с карточек ----------
+        function collectPortals() {
+            const cards = portalContainer.querySelectorAll('.portal-card-wrapper');
+            const portals = [];
+            portalArea = 0;
 
-            const cards = container.querySelectorAll('.portal-card-wrapper');
-            if (cards.length === 0) {
-                showAlert('Добавьте хотя бы один портал для расчета.', 'warning');
-                return;
-            }
-
-            const payload = { portals: [] };
-            let isValid = true;
-            totalArea = 0;
-
-            cards.forEach((card, index) => {
+            for (const [index, card] of cards.entries()) {
                 const width = parseFloat(card.querySelector('.p-width').value);
                 const height = parseFloat(card.querySelector('.p-height').value);
                 const amount = parseInt(card.querySelector('.p-amount').value);
                 const hasRain = card.querySelector('.p-rain').checked;
-                
-                const wood_type = card.querySelector('.p-wood').value;
+                const woodType = card.querySelector('.p-wood').value;
                 const color = card.querySelector('.p-color').value;
                 const hardware = card.querySelector('.p-hardware').value;
                 const hardwareColor = card.querySelector('.p-hardware-color').value;
                 const glazing = card.querySelector('.p-glazing').value;
+                const schemeRadio = card.querySelector('.scheme-radio:checked');
 
-                const selectedSchemeRadio = card.querySelector('.scheme-radio:checked');
-                if (!selectedSchemeRadio) {
-                    isValid = false;
-                    return;
+                if (!schemeRadio || !width || !height || !amount) {
+                    return { error: `Заполните все поля и выберите схему для портала #${index + 1}.` };
                 }
 
-                // Передаем дублирующие наборы ключей для совместимости с services.py и views.py
-                payload.portals.push({
+                portals.push({
                     name: `portal_${index}`,
-                    width: width,
-                    height: height,
+                    width,
+                    height,
+                    amount,
                     has_rain: hasRain,
-                    wood_type: wood_type,
-                    color: color,
-                    hardware: hardware,
-                    glazing: glazing,
-                    scheme: selectedSchemeRadio.value,
+                    wood_type: woodType,
+                    color,
+                    hardware,
+                    glazing,
+                    scheme: schemeRadio.value,
                     hardware_color: hardwareColor,
-                    amount: amount,
                 });
 
-                totalArea += (width * height / 1000000) * amount;
-            });
+                portalArea += (width * height / 1_000_000) * amount;
+            }
 
-            if (!isValid) {
-                showAlert('Пожалуйста, выберите схему открывания для каждого добавленного портала.');
+            return { portals };
+        }
+
+        // ---------- Расчет ----------
+        form.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            if (portalContainer.children.length === 0) {
+                showAlert('Добавьте хотя бы один портал для расчета.', 'warning');
                 return;
             }
 
-            lastPayload = payload;
-            resultContainer.innerHTML = `<div class="text-center mt-4"><div class="spinner-border text-primary"></div><p class="mt-2">Выполняется расчет позиций...</p></div>`;
+            const collected = collectPortals();
+            if (collected.error) {
+                showAlert(collected.error);
+                return;
+            }
+            portalsPayload = collected.portals;
 
-            fetch('{% url "orders:portal_order" %}', { 
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
-                body: JSON.stringify(payload)
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.error) throw new Error(data.error);
-                lastCalculationResult = data;
-                displayResults(data);
-            })
-            .catch(error => {
-                resultContainer.innerHTML = '';
-                showAlert(`Ошибка выполнения расчета: ${error.message}`);
-            });
+            runCalculation();
         });
 
-        function displayResults(data) {
+        async function runCalculation() {
+            resultsContainer.innerHTML = `<div class="text-center mt-4"><div class="spinner-border text-primary"></div><p class="mt-2">Выполняется расчет позиций...</p></div>`;
+
+            try {
+                const response = await fetch('{% url "orders:portal_order" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                    body: JSON.stringify({ portals: portalsPayload }),
+                });
+                const data = await response.json();
+                if (data.error) throw new Error(data.error);
+                portalCalcResult = data;
+                renderResults();
+            } catch (err) {
+                resultsContainer.innerHTML = '';
+                showAlert(`Ошибка выполнения расчета: ${err.message}`);
+            }
+        }
+
+        // ---------- Отображение результатов ----------
+        function renderResults() {
+            baseTotalPrice = parseFloat(portalCalcResult['total_with_ratio']) || 0;
+
             let html = '<h3 class="mb-3 border-bottom pb-2 mt-5">Результаты пакетного расчета</h3>';
-            baseTotalPrice = parseFloat(data["total_with_ratio"]) || 0;
+            html += '<div class="row g-3 mb-4">';
 
-            let cardsHtml = '<div class="row g-3 mb-4">';
-            
-            // Итерируемся по отправленному массиву, так как структура ответа - это словарь с именами
-            lastPayload.portals.forEach((p, index) => {
-                const portalResult = data[p.name] || {};
+            portalsPayload.forEach((portal, index) => {
+                const portalResult = portalCalcResult[portal.name] || {};
                 const portalTotal = portalResult.total_with_ratio || 0;
-                const schemeRatio = portalResult.scheme_ratio || 1;
-                const currentArea = (p.width * p.height / 1000000) * p.amount;
+                const area = (portal.width * portal.height / 1_000_000 * portal.amount).toFixed(2);
 
-                cardsHtml += `
+                html += `
                 <div class="col-md-6 col-lg-4">
                     <div class="card h-100 shadow-sm border-secondary">
                         <div class="card-header bg-dark text-white fw-bold d-flex justify-content-between align-items-center">
                             <span>Портал #${index + 1}</span>
-                            <span class="badge bg-primary">x${p.amount} шт.</span>
+                            <span class="badge bg-primary">x${portal.amount} шт.</span>
                         </div>
                         <div class="card-body p-0">
                             <table class="table table-sm table-bordered mb-0 text-center align-middle">
                                 <tbody>
-                                    <tr><td class="text-start ps-2 fw-semibold small">Схема / Дерево</td><td class="small">${p.scheme} / ${p.wood_type}</td></tr>
-                                    <tr><td class="text-start ps-2 fw-semibold small">Размер</td><td class="small">${p.width} x ${p.height} мм</td></tr>
-                                    <tr><td class="text-start ps-2 fw-semibold small">Площадь</td><td class="small">${currentArea.toFixed(2)} м²</td></tr>
+                                    <tr><td class="text-start ps-2 fw-semibold small">Схема / Дерево</td><td class="small">${portal.scheme} / ${portal.wood_type}</td></tr>
+                                    <tr><td class="text-start ps-2 fw-semibold small">Размер</td><td class="small">${portal.width} x ${portal.height} мм</td></tr>
+                                    <tr><td class="text-start ps-2 fw-semibold small">Площадь</td><td class="small">${area} м²</td></tr>
                                     <tr class="table-secondary fw-bold"><td class="text-start ps-2 small">ИТОГО за позицию</td><td class="small">${portalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб</td></tr>
                                 </tbody>
                             </table>
@@ -392,13 +407,13 @@
                     </div>
                 </div>`;
             });
-            cardsHtml += '</div>';
-            html += cardsHtml;
+
+            html += '</div>';
 
             html += `
             <div class="card mb-4 bg-light shadow-sm border-secondary">
                 <div class="card-body">
-                    <h5 class="card-title fw-bold mb-3 text-dark">🚚 Дополнительные параметры заказа</h5>
+                    <h5 class="card-title fw-bold mb-3">🚚 Дополнительные параметры заказа</h5>
                     <div class="row g-3">
                         <div class="col-lg col-md-4">
                             <label class="form-label fw-bold small">Монтаж (руб/м²)</label>
@@ -417,13 +432,13 @@
                             <input type="number" class="form-control cost-input" id="discountRate" min="0" value="0">
                         </div>
                     </div>
-                    <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0 border-dark shadow-sm d-flex flex-wrap justify-content-center align-items-center gap-3" id="dynamicGrandTotalWrapper">
-                        <span id="dynamicGrandTotal">Итого с учетом доп. услуг: 0.00 руб.</span>
+                    <div class="mt-4 alert alert-dark fs-4 text-center fw-bold mb-0 border-dark shadow-sm d-flex flex-wrap justify-content-center align-items-center gap-3">
+                        <span id="dynamicGrandTotal"></span>
                         ${isAdmin ? '' : `<span id="dealerPercentageBlock" class="border-start ps-3"></span>`}
                     </div>
                 </div>
             </div>`;
-            
+
             html += `<div class="d-flex flex-wrap gap-2 mb-5">
                 <button type="button" class="btn btn-primary btn-lg ms-auto shadow" id="saveOrderBtn">Сохранить заказ</button>
                 <button type="button" class="btn btn-outline-dark btn-lg" id="downloadKpBtn" style="display: none;">
@@ -431,23 +446,15 @@
                 </button>
             </div>`;
 
-            resultContainer.innerHTML = html;
+            resultsContainer.innerHTML = html;
 
-            document.querySelectorAll('.cost-input').forEach(inp => inp.addEventListener('input', recalculateGrandTotal));
+            document.querySelectorAll('.cost-input').forEach(input => input.addEventListener('input', recalculateGrandTotal));
             recalculateGrandTotal();
 
-            document.getElementById('saveOrderBtn').onclick = function() {
+            document.getElementById('saveOrderBtn').addEventListener('click', function () {
                 saveOrder(this);
-            };
-
-            document.getElementById('downloadKpBtn').onclick = function() {
-                downloadKp();
-            };
-        }
-
-        function downloadKp() {
-            if (!savedOrderId) return;
-            window.location.href = downloadKpUrlTemplate.replace('/0/', `/${savedOrderId}/`);
+            });
+            document.getElementById('downloadKpBtn').addEventListener('click', downloadKp);
         }
 
         function recalculateGrandTotal() {
@@ -456,12 +463,13 @@
             const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
-            const finalTotal = baseTotalPrice + (totalArea * installRate) + delivery + unloading - discount;
-            lastGrandTotal = finalTotal;
-            document.getElementById('dynamicGrandTotal').textContent = `Итого с учетом доп. услуг: ${finalTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
+            lastGrandTotal = baseTotalPrice + (portalArea * installRate) + delivery + unloading - discount;
+
+            document.getElementById('dynamicGrandTotal').textContent =
+                `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${lastGrandTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
 
             if (!isAdmin) {
-                const dealerAmount = Math.round(dealerPercentage / 100 * finalTotal);
+                const dealerAmount = Math.round(dealerPercentage / 100 * lastGrandTotal);
                 const dealerBlock = document.getElementById('dealerPercentageBlock');
                 if (dealerBlock) {
                     dealerBlock.textContent = `Процент дилера (${dealerPercentage}%): ${dealerAmount.toLocaleString('ru-RU')} руб.`;
@@ -469,58 +477,60 @@
             }
         }
 
+        function downloadKp() {
+            if (!savedOrderId) return;
+            window.location.href = downloadKpUrlTemplate.replace('/0/', `/${savedOrderId}/`);
+        }
+
+        // ---------- Сохранение заказа ----------
         async function saveOrder(btnElement) {
-            if (!lastPayload) return;
-            const payload = { ...lastPayload };
-            payload.buyer_id = buyerSelect.value;
-            payload.installation = parseFloat(document.getElementById('installRate').value) || 0;
-            payload.delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
-            payload.unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
-            payload.discount = parseInt(document.getElementById('discountRate').value) || 0;
-            payload.order_total = lastGrandTotal;
-            
+            const payload = {
+                buyer_id: buyerSelect.value,
+                installation: parseFloat(document.getElementById('installRate').value) || 0,
+                delivery: parseFloat(document.getElementById('deliveryCost').value) || 0,
+                unloading: parseFloat(document.getElementById('unloadingCost').value) || 0,
+                discount: parseInt(document.getElementById('discountRate').value) || 0,
+                order_total: lastGrandTotal,
+                portals: portalsPayload,
+            };
+
             if (payload.buyer_id === 'new') {
                 payload.buyer_data = {
                     first_name: document.getElementById('buyerFirstName').value,
                     last_name: document.getElementById('buyerLastName').value,
                     phone: document.getElementById('buyerPhone').value,
-                    email: document.getElementById('buyerEmail').value
+                    email: document.getElementById('buyerEmail').value,
                 };
             }
-            else
-            {
-                payload.buyer_data = {};
-            }
-            
+
+            const requestBody = {
+                config: payload,
+                calculations: portalCalcResult,
+            };
+
             btnElement.disabled = true;
             btnElement.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Сохранение...';
-            
-            const combinedPayload = {
-                config: payload,
-                calculations: lastCalculationResult
-            };
 
             try {
                 const response = await fetch('{% url "orders:portal_order_save" %}', {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': document.querySelector('[name=csrfmiddlewaretoken]').value },
-                    body: JSON.stringify(combinedPayload)
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                    body: JSON.stringify(requestBody),
                 });
                 const data = await response.json();
                 if (data.status === 'success') {
-                    showAlert(`Заказ успешно сохранен!`, 'success');
-                    btnElement.innerHTML = 'Заказ успешно сохранен';
+                    showAlert('Заказ успешно сохранен!', 'success');
+                    btnElement.innerHTML = 'Заказ сохранен';
                     btnElement.classList.replace('btn-primary', 'btn-secondary');
                     savedOrderId = data.order_id;
-                    const kpBtn = document.getElementById('downloadKpBtn');
-                    if (kpBtn) kpBtn.style.display = 'inline-block';
+                    document.getElementById('downloadKpBtn').style.display = 'inline-block';
                 } else {
-                    showAlert('Ошибка при сохранении: ' + data.error);
+                    showAlert('Ошибка сохранения: ' + data.error);
                     btnElement.disabled = false;
                     btnElement.innerHTML = 'Сохранить заказ';
                 }
             } catch (err) {
-                showAlert('Ошибка сети/соединения: ' + err.message);
+                showAlert('Ошибка соединения: ' + err.message);
                 btnElement.disabled = false;
                 btnElement.innerHTML = 'Сохранить заказ';
             }

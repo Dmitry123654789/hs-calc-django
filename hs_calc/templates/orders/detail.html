@@ -56,9 +56,9 @@
                 <div class="tab-pane fade" id="portal-materials-pane" role="tabpanel" aria-labelledby="portal-materials-tab">
                     {% for product in portals %}
                         {% if product.calculation_details.materials %}
-                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-amount="{{ product.amount }}" data-area="{{ product.calculation_details.area }}">
                                 Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
-                                <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                                <span class="fs-6 fw-normal text-muted product-area-display">| Площадь 1 шт: {{ product.calculation_details.area }} м²{% if product.amount > 1 %} (Общая: {% widthratio product.calculation_details.area 1 product.amount %} м²){% endif %}</span>
                             </h4>
                             {% for scheme_name, scheme_data in product.calculation_details.materials.items %}
                                 <div class="card mb-4 shadow-sm border-secondary">
@@ -108,7 +108,7 @@
                                                     {% endfor %}
                                                     <tr class="table-secondary fw-bold total-row">
                                                         <td>ИТОГО ЗА 1 ШТ.</td>
-                                                        <td class="total-price-cell">0.00</td>
+                                                        <td class="total-price-cell">{{ product.calculation_details.materials_total }}</td>
                                                         <td colspan="2"></td>
                                                     </tr>
                                                 </tbody>
@@ -124,9 +124,9 @@
                 <div class="tab-pane fade" id="portal-labor-pane" role="tabpanel" aria-labelledby="portal-labor-tab">
                     {% for product in portals %}
                         {% if product.calculation_details.materials and product.calculation_details.labor %}
-                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-amount="{{ product.amount }}" data-area="{{ product.calculation_details.area }}">
                                 Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
-                                <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                                <span class="fs-6 fw-normal text-muted product-area-display">| Площадь 1 шт: {{ product.calculation_details.area }} м²{% if product.amount > 1 %} (Общая: {% widthratio product.calculation_details.area 1 product.amount %} м²){% endif %}</span>
                             </h4>
                             {% for labor_scheme, labor_details in product.calculation_details.labor.items %}
                             <div class="card mb-5 shadow-sm border-info">
@@ -152,7 +152,7 @@
                                                 <td>{{ costs.painter }}</td>
                                             </tr>
                                             {% endfor %}
-                                            <tr class="table-secondary fw-bold">
+                                            <tr class="table-secondary fw-bold total-row">
                                                 <td>ИТОГО ЗА 1 ШТ.</td>
                                                 <td class="total-stolyar-cell">0.00</td>
                                                 <td class="total-malyar-cell">0.00</td>
@@ -169,9 +169,9 @@
                 <div class="tab-pane fade show active" id="portal-summary-pane" role="tabpanel" aria-labelledby="portal-summary-tab">
                     {% for product in portals %}
                         {% if product.calculation_details.materials %}
-                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                            <h4 class="mt-4 product-header" data-product-id="portal-{{ product.id }}" data-amount="{{ product.amount }}" data-area="{{ product.calculation_details.area }}">
                                 Портал (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
-                                <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                                <span class="fs-6 fw-normal text-muted product-area-display">| Площадь 1 шт: {{ product.calculation_details.area }} м²{% if product.amount > 1 %} (Общая: {% widthratio product.calculation_details.area 1 product.amount %} м²){% endif %}</span>
                             </h4>
                             {% for scheme_name, scheme_data in product.calculation_details.materials.items %}
                                 <div class="card mb-4 shadow-sm">
@@ -182,8 +182,8 @@
                                         <table class="table table-bordered mb-0 align-middle summary-table">
                                             <tbody>
                                                 <tr>
-                                                    <td class="fw-semibold">Стоимость материалов</td>
-                                                    <td class="summary-materials-cell" data-sheet-name="Портал_{{ scheme_name }}_{{ product.id }}">—</td>
+                                                    <td class="fw-semibold">Стоимость материалов (за {{ product.amount }} шт.)</td>
+                                                    <td class="summary-materials-cell">{{ product.calculation_details.materials_total_all }}</td>
                                                 </tr>
                                                 <tr>
                                                     <td class="fw-semibold">Стоимость работы столяра</td>
@@ -191,7 +191,7 @@
                                                 </tr>
                                                 <tr>
                                                     <td class="fw-semibold">Стоимость работы маляра</td>
-                                                    <td>{% widthratio scheme_data.labor_carpenter.price 1 product.amount %}</td>
+                                                    <td>{% widthratio scheme_data.labor_painter.price 1 product.amount %}</td>
                                                 </tr>
                                                 <tr class="table-secondary fw-bold">
                                                     <td>ИТОГО (с коэффициентом)</td>
@@ -212,9 +212,9 @@
         {% if glukhars %}
         <div class="tab-pane fade {% if not portals %}show active{% endif %}" id="glukhars-pane" role="tabpanel" aria-labelledby="glukhars-tab">
             {% for product in glukhars %}
-                <h4 class="mt-4 product-header" data-product-id="glukhar-{{ product.id }}" data-width="{{ product.width }}" data-height="{{ product.height }}" data-amount="{{ product.amount }}">
+                <h4 class="mt-4 product-header" data-product-id="glukhar-{{ product.id }}" data-amount="{{ product.amount }}" data-area="{{ product.calculation_details.area }}">
                     Глухарь (Ш:{{ product.width }} x В:{{ product.height }}, {{ product.amount }} шт.)
-                    <span class="fs-6 fw-normal text-muted product-area-display"></span>
+                    <span class="fs-6 fw-normal text-muted product-area-display">| Площадь 1 шт: {{ product.calculation_details.area }} м²{% if product.amount > 1 %} (Общая: {% widthratio product.calculation_details.area 1 product.amount %} м²){% endif %}</span>
                 </h4>
                 <div class="card mb-4 shadow-sm">
                     <div class="card-body p-0">
@@ -349,34 +349,22 @@
 <script src="{% static 'js/xlsx.full.min.js' %}"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Подсчет площади изделий и стоимости установки
+        // Подсчет площади изделий и стоимости установки.
+        // Площадь 1 шт. уже посчитана на бэкенде (calculation_details.area)
+        // и выведена в шаблоне — здесь только суммируем ее по заказу.
         let totalArea = 0;
         let processedProducts = new Set();
 
         document.querySelectorAll('.product-header').forEach(function(header) {
             const productId = header.getAttribute('data-product-id');
-            const w = parseFloat(header.getAttribute('data-width')) || 0;
-            const h = parseFloat(header.getAttribute('data-height')) || 0;
-            const amount = parseInt(header.getAttribute('data-amount')) || 1;
-            
-            // Перевод мм в метры квадратные
-            const area = (w * h) / 1000000;
+            const area = parseFloat(header.getAttribute('data-area').replace(',', '.')) || 0;
+            const amount = parseFloat(header.getAttribute('data-amount')) || 1;
             const totalProductArea = area * amount;
-            
-            // Избегаем двойного учета площади для порталов из-за наличия двух вкладок 
+
+            // Избегаем двойного учета площади для порталов из-за наличия трех вкладок
             if (productId && !processedProducts.has(productId)) {
                 totalArea += totalProductArea;
                 processedProducts.add(productId);
-            }
-            
-            let areaText = ` | Площадь 1 шт: ${area.toFixed(2)} м²`;
-            if (amount > 1) {
-                areaText += ` (Общая: ${totalProductArea.toFixed(2)} м²)`;
-            }
-            
-            const display = header.querySelector('.product-area-display');
-            if (display) {
-                display.textContent = areaText;
             }
         });
 
@@ -389,24 +377,18 @@
             totalCell.textContent = installCost.toFixed(2) + ' руб.';
         }
 
-        // Подсчет rowspan и итогов для Порталов (Материалы)
+        // Подсчет rowspan для Порталов (Материалы).
+        // Суммы ("ИТОГО ЗА 1 ШТ.") уже готовы на бэкенде и выведены
+        // в шаблоне (calculation_details.materials_total) — здесь только
+        // визуально объединяем повторяющиеся строки одной детали.
         document.querySelectorAll(".main-table").forEach(function(table) {
             const rows = table.querySelectorAll("tbody tr.detail-row");
             let currentDetail = null;
             let startRowIdx = 0;
             let currentSpan = 0;
-            let totalPrice = 0;
-            let uniqueDetails = new Set();
 
             rows.forEach(function(row, index) {
                 const detailName = row.getAttribute("data-detail-name");
-                let priceStr = row.getAttribute("data-detail-price") || "0";
-                const detailPrice = parseFloat(priceStr.replace(',', '.')) || 0;
-
-                if (!uniqueDetails.has(detailName)) {
-                    uniqueDetails.add(detailName);
-                    totalPrice += detailPrice;
-                }
 
                 if (currentDetail === null) {
                     currentDetail = detailName;
@@ -432,17 +414,11 @@
                 firstRowOfGroup.querySelector(".cell-name").setAttribute("rowspan", currentSpan);
                 firstRowOfGroup.querySelector(".cell-price").setAttribute("rowspan", currentSpan);
             }
-
-            const totalCell = table.querySelector(".total-price-cell");
-            if (totalCell) totalCell.textContent = totalPrice.toFixed(2);
-
-            // Пробрасываем ту же сумму (материалы без учета работы) во вкладку "Общее"
-            const sheetName = table.getAttribute("data-sheet-name");
-            const summaryCell = document.querySelector(`.summary-materials-cell[data-sheet-name="${sheetName}"]`);
-            if (summaryCell) summaryCell.textContent = totalPrice.toFixed(2);
         });
 
-        // Подсчет итогов для Порталов (Трудозатраты)
+        // Подсчет итогов для Порталов (Трудозатраты). Эта сумма
+        // самодостаточна (складывает столбцы Столяр/Маляр внутри той же
+        // таблицы) и не требует данных из calculation_details.
         document.querySelectorAll(".labor-table").forEach(function(table) {
             const rows = table.querySelectorAll("tbody tr.labor-row");
             let totalStolyar = 0;
@@ -594,7 +570,7 @@
 
         // Получение итоговой строки трудозатрат
         function getLaborTotal(table) {
-            const totalRow = table.querySelector('tr.table-secondary.fw-bold');
+            const totalRow = table.querySelector('tr.total-row');
             if (!totalRow) return null;
             const cells = totalRow.querySelectorAll('td');
             if (cells.length < 3) return null;
