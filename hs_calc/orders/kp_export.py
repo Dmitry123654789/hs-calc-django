@@ -1,92 +1,37 @@
-# -*- coding: utf-8 -*-
-"""
-Генератор коммерческого предложения (.docx) по заказу (Order).
-
-Идея: на вход подаётся объект Order. Сервис сам находит все связанные
-с заказом изделия — Portal (порталы) и Glukhar (глухие окна) — и строит
-docx-файл, повторяя блок "изделие" столько раз, сколько изделий каждого
-типа есть в заказе (0..N штук каждого вида).
-
-Зависимости: python-docx (пакет "python-docx" на PyPI, импортируется как `docx`).
-
-    pip install python-docx
-
-Как использовать в Django:
-
-    from orders.models import Order
-    from proposal_generator import build_commercial_proposal
-
-    order = Order.objects.get(pk=order_id)
-    buffer = build_commercial_proposal(order)  # BytesIO
-    response = HttpResponse(
-        buffer.getvalue(),
-        content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    )
-    response["Content-Disposition"] = f'attachment; filename="KP_{order.pk}.docx"'
-    return response
-
---------------------------------------------------------------------------
-ВАЖНО — места, которые нужно донастроить под реальный проект (см. пометки
-"# НАСТРОЙКА:" по тексту):
-
-1. get_product_price() — рассчитывает на то, что calculation_details и у
-   Portal, и у Glukhar имеет единую форму (после унификации
-   calculate_portals/calculate_glukhar в calculate/services.py):
-   {"type":, "amount":, "materials":, "labor":, "total":, "ratio":,
-   "total_with_ratio":}. Если ключи называются иначе — поправьте
-   PRICE_KEYS.
-
-2. get_portal_image_path() / get_glukhar_image_path() — сейчас картинка
-   подбирается по названию схемы (Scheme.name) / типа дерева (для
-   глухаря) через словари SCHEME_IMAGE_MAP / GLUKHAR_IMAGE_MAP, с
-   резервным изображением по умолчанию. Пропишите там реальные пути к
-   файлам в static (STATIC_ROOT / STATICFILES_DIRS).
-
-3. Шапка документа (компания, ИНН, ОГРН, срок отгрузки) — эти данные не
-   хранятся в Order, поэтому вынесены в параметры build_commercial_proposal().
-
-4. Текст "Тип стеклопакета" всегда "40мм закалённый" — как и попросили.
-   Сторона ручки определяется по имени hardware_type: "Standard" →
-   односторонняя, "Standard+" → двухсторонняя (см. HARDWARE_SIDE_MAP).
-"""
-
-from __future__ import annotations
-
+from datetime import date
+from decimal import Decimal, InvalidOperation
 import io
 import os
-from dataclasses import dataclass
-from decimal import Decimal, InvalidOperation
-from typing import Iterable, Optional
+from typing import Iterable, Optional, Sequence
 
+from django.contrib.staticfiles import finders
 from docx import Document
-from docx.enum.table import WD_TABLE_ALIGNMENT
+from docx.document import Document as DocumentType
+from docx.enum.table import WD_ROW_HEIGHT_RULE
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Cm, Pt, RGBColor
-from docx.enum.section import WD_SECTION
+from PIL import Image
 
 
-# --------------------------------------------------------------------------
-# НАСТРОЙКА: пути к изображениям изделий.
-#
-# Ключ — Scheme.name (для порталов) / GlukharWood.name (для глухих окон).
-# Значение — абсолютный путь к файлу картинки в статике проекта.
-# Если для конкретной схемы/дерева картинки нет в словаре — используется
-# DEFAULT_PORTAL_IMAGE / DEFAULT_GLUKHAR_IMAGE.
-# --------------------------------------------------------------------------
-ASSETS_DIR = os.path.join(os.path.dirname(__file__), "assets")
+def asset_path(name: str) -> str:
+    path = finders.find(f"img/calculate/{name}")
+    if isinstance(path, list):
+        return str(path[0]) if path else ""
 
-DEFAULT_PORTAL_IMAGE = os.path.join(ASSETS_DIR, "portal_default.jpg")
-DEFAULT_GLUKHAR_IMAGE = os.path.join(ASSETS_DIR, "glukhar_default.jpeg")
-COMPANY_LOGO = os.path.join(ASSETS_DIR, "logo.png")
+    return str(path) if path else ""
 
-# Пример: "Схема А": "/path/to/static/portals/scheme_a.jpg"
-SCHEME_IMAGE_MAP: dict[str, str] = {
-    # "Схема А. HS-портал": os.path.join(ASSETS_DIR, "scheme_a.jpg"),
-}
 
-GLUKHAR_IMAGE_MAP: dict[str, str] = {
-    # "Сосна": os.path.join(ASSETS_DIR, "glukhar_pine.jpg"),
+GLUKHAR_IMAGE = asset_path("schemes/glukhar_default.jpg")
+COMPANY_LOGO = asset_path("logo.png")
+
+SCHEME_IMAGE_MAP = {
+    "scheme_A": asset_path("schemes/scheme_A.png"),
+    "scheme_C": asset_path("schemes/scheme_C.png"),
+    "scheme_G": asset_path("schemes/scheme_G.png"),
+    "scheme_E": asset_path("schemes/scheme_E.png"),
+    "scheme_L": asset_path("schemes/scheme_L.png"),
 }
 
 # Сторона ручки по названию типа фурнитуры (Hardware.name)
@@ -97,29 +42,24 @@ HARDWARE_SIDE_MAP = {
 
 GLASS_TYPE_TEXT = "40мм закалённый"
 
-# НАСТРОЙКА: под какими ключами в calculation_details лежит финальная
-# цена изделия. После унификации calculate_portals/calculate_glukhar
-# (см. calculate/services.py) оба типа изделий отдают одинаковые
-# ключи "total_with_ratio" / "total", поэтому список общий для обоих.
-PRICE_KEYS = ("total_with_ratio", "total")
+FONT_NAME = "Calibri"
+NORMAL_FONT_SIZE = 14
+HEADING_FONT_SIZE = 18
 
-FONT_NAME = "Times New Roman"
-
-SCHEME_LETTERS = "АБВГДЕЖЗИКЛМНОПРСТУФХЦЧШЩЭЮЯ"
-
-
-# --------------------------------------------------------------------------
-# Вспомогательные функции
-# --------------------------------------------------------------------------
+PAGE_WIDTH_CM = 21.0
+PAGE_HEIGHT_CM = 29.7
 
 
 def _to_decimal(value) -> Decimal:
     if isinstance(value, Decimal):
         return value
+
     if value is None:
         return Decimal("0")
+
     try:
         return Decimal(str(value))
+
     except (InvalidOperation, ValueError, TypeError):
         return Decimal("0")
 
@@ -127,13 +67,13 @@ def _to_decimal(value) -> Decimal:
 def _fmt_money(value) -> str:
     """1999999.5 -> '1 999 999,50 ₽'"""
     value = _to_decimal(value).quantize(Decimal("0.01"))
-    sign, digits, exponent = value.as_tuple()
     int_part = str(abs(value.to_integral_value(rounding="ROUND_FLOOR")))
     frac = f"{abs(value):.2f}".split(".")[1]
     grouped = []
     while len(int_part) > 3:
         grouped.insert(0, int_part[-3:])
         int_part = int_part[:-3]
+
     grouped.insert(0, int_part)
     formatted = " ".join(grouped)
     prefix = "-" if value < 0 else ""
@@ -148,29 +88,21 @@ def _fmt_area(value) -> str:
 def get_product_price(product) -> Decimal:
     """
     Достаёт итоговую (с коэффициентом) стоимость партии изделия из уже
-    посчитанного product.calculation_details. Portal и Glukhar теперь
-    отдают одинаковую по форме структуру (type/amount/materials/labor/
-    total/ratio/total_with_ratio), поэтому обработка общая для обоих.
+    посчитанного product.calculation_details. Portal и Glukhar отдают
+    одинаковую по форме структуру и всегда кладут туда ключ
+    "total_with_ratio", поэтому обработка — прямое обращение по ключу,
+    без перебора возможных вариантов названия.
     """
     details = getattr(product, "calculation_details", None) or {}
     if not isinstance(details, dict):
         return Decimal("0")
 
-    for key in PRICE_KEYS:
-        if key in details:
-            return _to_decimal(details[key])
-
-    return Decimal("0")
+    return _to_decimal(details.get("total_with_ratio"))
 
 
 def get_portal_image_path(portal) -> str:
     scheme_name = getattr(getattr(portal, "scheme", None), "name", None)
-    return SCHEME_IMAGE_MAP.get(scheme_name, DEFAULT_PORTAL_IMAGE)
-
-
-def get_glukhar_image_path(glukhar) -> str:
-    wood_name = getattr(getattr(glukhar, "wood_type", None), "name", None)
-    return GLUKHAR_IMAGE_MAP.get(wood_name, DEFAULT_GLUKHAR_IMAGE)
+    return SCHEME_IMAGE_MAP.get(scheme_name) or ""
 
 
 def get_hardware_side_text(portal) -> str:
@@ -183,144 +115,394 @@ def get_color_display(product) -> str:
     return getattr(color, "name", "") or "-"
 
 
-# --------------------------------------------------------------------------
+def get_scheme_letter(scheme) -> str:
+    """
+    Scheme.name в БД всегда имеет вид "scheme_<буква>" (scheme_A, scheme_C,
+    scheme_G, scheme_E, scheme_L, ...) — буква для заголовка "Схема А." это
+    то, что стоит после последнего "_" в имени.
+    """
+    return scheme.name.rsplit("_", 1)[-1]
+
+
 # Низкоуровневые помощники для python-docx
-# --------------------------------------------------------------------------
-
-
-def _set_cell_shading(cell, hex_color: str) -> None:
-    shd = cell._tc.get_or_add_tcPr().makeelement(qn("w:shd"), {})
-    shd.set(qn("w:val"), "clear")
-    shd.set(qn("w:color"), "auto")
-    shd.set(qn("w:fill"), hex_color)
-    cell._tc.get_or_add_tcPr().append(shd)
-
-
-def _set_font(run, size=11, bold=False, color=None):
+def _set_font(run, size=NORMAL_FONT_SIZE, bold=False, color=None):
     run.font.name = FONT_NAME
     run.font.size = Pt(size)
     run.font.bold = bold
     if color:
         run.font.color.rgb = RGBColor.from_string(color)
+
     rpr = run._element.get_or_add_rPr()
     rfonts = rpr.find(qn("w:rFonts"))
     if rfonts is None:
         rfonts = rpr.makeelement(qn("w:rFonts"), {})
         rpr.append(rfonts)
+
     rfonts.set(qn("w:eastAsia"), FONT_NAME)
 
 
-def _add_heading(doc: Document, text: str) -> None:
+def _configure_normal_style(doc: DocumentType) -> None:
+    """Шрифт Calibri/14pt и нулевые интервалы абзаца как базовый стиль
+    документа — подстраховка для параграфов/ячеек, где не выставляется
+    прямое форматирование запуска (run)."""
+    normal = doc.styles["Normal"]
+    normal.font.name = FONT_NAME
+    normal.font.size = Pt(NORMAL_FONT_SIZE)
+    normal.paragraph_format.space_before = Pt(0)
+    normal.paragraph_format.space_after = Pt(0)
+    rpr = normal.element.get_or_add_rPr()
+    rfonts = rpr.find(qn("w:rFonts"))
+    if rfonts is None:
+        rfonts = rpr.makeelement(qn("w:rFonts"), {})
+        rpr.append(rfonts)
+
+    rfonts.set(qn("w:eastAsia"), FONT_NAME)
+
+
+def _zero_spacing(paragraph) -> None:
+    """Интервал перед/после абзаца = 0pt — применяется к каждому создаваемому
+    абзацу, чтобы гарантированно выполнялось «везде», а не только там, где
+    сработал стиль Normal (прямое форматирование имеет приоритет)."""
+    paragraph.paragraph_format.space_before = Pt(0)
+    paragraph.paragraph_format.space_after = Pt(0)
+
+
+def _set_paragraph_edge_indent(paragraph, left_cm: float, right_cm: float) -> None:
+    paragraph.paragraph_format.left_indent = Cm(left_cm)
+    paragraph.paragraph_format.right_indent = Cm(right_cm)
+
+
+def _set_table_left_indent(table, left_cm: float) -> None:
+    """Абсолютный отступ таблицы от левого края (w:tblInd). Требует, чтобы
+    поля секции (left/right margin) были равны 0 — иначе отступ будет
+    считаться от границы текстовой области, а не от края листа."""
+    tbl_pr = table._tbl.tblPr
+    tbl_ind = tbl_pr.find(qn("w:tblInd"))
+    if tbl_ind is None:
+        tbl_ind = OxmlElement("w:tblInd")
+        tbl_pr.append(tbl_ind)
+
+    tbl_ind.set(qn("w:w"), str(Cm(left_cm).twips))
+    tbl_ind.set(qn("w:type"), "dxa")
+
+
+def _zero_table_cell_margins(table) -> None:
+    """
+    Обнуляет внутренние поля ячеек по умолчанию для всей таблицы.
+    Без этого Word/LibreOffice подставляют свои дефолтные поля ячейки
+    (~0.19-0.25 см с каждой стороны), и фактическое содержимое ячейки
+    (в частности — картинка ровно по ширине ячейки) визуально сжимается
+    внутрь на эту величину, из-за чего реальный отступ от края листа
+    отличается от заданного.
+    """
+    tbl_pr = table._tbl.tblPr
+    cell_mar = tbl_pr.find(qn("w:tblCellMar"))
+    if cell_mar is None:
+        cell_mar = OxmlElement("w:tblCellMar")
+        tbl_pr.append(cell_mar)
+
+    for side in ("top", "left", "bottom", "right"):
+        el = cell_mar.find(qn(f"w:{side}"))
+        if el is None:
+            el = OxmlElement(f"w:{side}")
+            cell_mar.append(el)
+
+        el.set(qn("w:w"), "0")
+        el.set(qn("w:type"), "dxa")
+
+
+def _set_table_width_dxa(table, width_dxa: int) -> None:
+    """Явно фиксирует общую ширину таблицы (w:tblW) в twips, вместо
+    оставленного по умолчанию type="auto" — иначе рендерер может сам
+    пересчитывать итоговую ширину таблицы, а не брать её строго из суммы
+    ширин колонок."""
+    tbl_pr = table._tbl.tblPr
+    tbl_w = tbl_pr.find(qn("w:tblW"))
+    if tbl_w is None:
+        tbl_w = OxmlElement("w:tblW")
+        tbl_pr.append(tbl_w)
+
+    tbl_w.set(qn("w:w"), str(width_dxa))
+    tbl_w.set(qn("w:type"), "dxa")
+
+
+def _set_table_edge_indent(
+    table,
+    left_cm: float,
+    right_cm: float,
+    col_widths_cm: Sequence[float],
+    *,
+    zero_cell_margins: bool = False,
+) -> None:
+    """
+    Позиционирует таблицу строго по отступам от левого/правого края листа:
+    задаёт w:tblInd = left_cm, а ширину колонок (сумма = PAGE_WIDTH_CM -
+    left_cm - right_cm) выставляет и на уровне колонок, и на уровне каждой
+    ячейки (без дублирования на ячейках python-docx/Word не всегда
+    применяет ширину колонки), плюс явную общую ширину таблицы (иначе
+    рендерер может пересчитать её сам вместо суммы колонок).
+    zero_cell_margins=True дополнительно обнуляет внутренние поля ячеек —
+    нужно там, где содержимое (например картинка) обязано занимать ровно
+    заявленную ширину ячейки без «утапливания» дефолтными полями Word
+    (~0.2 см с каждой стороны). Для обычных текстовых таблиц оставляем
+    поля Word по умолчанию — иначе текст визуально прилипает к границам
+    ячеек.
+    Таблица не должна иметь w:jc (table.alignment) — это конфликтует с
+    абсолютным отступом tblInd.
+    """
+    table.autofit = False
+    _set_table_left_indent(table, left_cm)
+    if zero_cell_margins:
+        _zero_table_cell_margins(table)
+
+    total_dxa = 0
+    for i, w in enumerate(col_widths_cm):
+        table.columns[i].width = Cm(w)
+        total_dxa += Cm(w).twips
+
+    for row in table.rows:
+        for cell, w in zip(row.cells, col_widths_cm):
+            cell.width = Cm(w)
+
+    _set_table_width_dxa(table, total_dxa)
+
+
+def _set_cell_borders(
+    cell,
+    *,
+    top: Optional[str] = None,
+    bottom: Optional[str] = None,
+    left: Optional[str] = None,
+    right: Optional[str] = None,
+) -> None:
+    """
+    Управляет границами конкретной ячейки по каждой стороне отдельно.
+    Значение стороны: None — не трогать (наследуется от стиля таблицы),
+    "none" — скрыть эту границу у этой ячейки, "single" — одинарная
+    чёрная линия 0.5pt (как в стиле Table Grid).
+    Прямое форматирование на уровне ячейки имеет приоритет над стилем
+    таблицы, поэтому этим можно сделать один столбец полностью без
+    рамок, а соседний — полностью с рамками, даже в одной таблице.
+    """
+    tc_pr = cell._tc.get_or_add_tcPr()
+    borders = tc_pr.find(qn("w:tcBorders"))
+    if borders is None:
+        borders = OxmlElement("w:tcBorders")
+        tc_pr.append(borders)
+
+    for side, spec in (
+        ("top", top),
+        ("bottom", bottom),
+        ("left", left),
+        ("right", right),
+    ):
+        if spec is None:
+            continue
+
+        el = borders.find(qn(f"w:{side}"))
+        if el is None:
+            el = OxmlElement(f"w:{side}")
+            borders.append(el)
+
+        if spec == "none":
+            el.set(qn("w:val"), "nil")
+            el.set(qn("w:sz"), "0")
+            el.set(qn("w:space"), "0")
+            el.set(qn("w:color"), "auto")
+        elif spec == "single":
+            el.set(qn("w:val"), "single")
+            el.set(qn("w:sz"), "4")  # 4 = 0.5pt, восьмые доли пункта
+            el.set(qn("w:space"), "0")
+            el.set(qn("w:color"), "000000")
+
+
+def _add_heading(
+    doc: DocumentType,
+    text: str,
+    *,
+    bold: bool = True,
+    size: int = NORMAL_FONT_SIZE,
+    left_cm: float = 1.5,
+    right_cm: float = 1.5,
+) -> None:
     p = doc.add_paragraph()
-    p.paragraph_format.space_before = Pt(12)
-    p.paragraph_format.space_after = Pt(6)
+    _zero_spacing(p)
+    _set_paragraph_edge_indent(p, left_cm - 0.2, right_cm)
     run = p.add_run(text)
-    _set_font(run, size=13, bold=True)
+    _set_font(run, size=size, bold=bold)
 
 
-def _add_kv_table(doc: Document, rows: Iterable[tuple[str, str]]) -> None:
-    """Двухколоночная таблица 'подпись | значение' (Материал/Фурнитура/Цвет/...)."""
+def _add_kv_table(
+    doc: DocumentType,
+    rows: Iterable[tuple[str, str]],
+    *,
+    left_cm: float = 1.5,
+    right_cm: float = 1.5,
+) -> None:
+    """Двухколоночная таблица 'подпись | значение' (Материал/Фурнитура/Цвет/...)
+    — «таблица с характеристиками товара»."""
     rows = list(rows)
     table = doc.add_table(rows=len(rows), cols=2)
     table.style = "Table Grid"
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table.autofit = False
-    widths = (Cm(4.5), Cm(11.5))
+
+    total_width = PAGE_WIDTH_CM - left_cm - right_cm
+    label_w = total_width * (4.5 / 16)
+    value_w = total_width - label_w
+    _set_table_edge_indent(table, left_cm, right_cm, [label_w, value_w])
+
     for i, (label, value) in enumerate(rows):
         row = table.rows[i]
-        row.cells[0].width = widths[0]
-        row.cells[1].width = widths[1]
 
         p0 = row.cells[0].paragraphs[0]
+        _zero_spacing(p0)
         r0 = p0.add_run(label)
-        _set_font(r0, size=10, bold=True)
+        _set_font(r0, bold=True)
 
         p1 = row.cells[1].paragraphs[0]
+        _zero_spacing(p1)
         r1 = p1.add_run(str(value))
-        _set_font(r1, size=10)
-    doc.add_paragraph()
+        _set_font(r1)
+
+    spacer = doc.add_paragraph()
+    _zero_spacing(spacer)
 
 
-def _safe_image_stream(image_path: str) -> io.BytesIO:
+def _safe_image_stream(image_path: str) -> tuple[io.BytesIO, int, int]:
     """
-    python-docx's own JPEG-header parser иногда не распознаёт progressive
+    python-docx's own JPEG-header парсер иногда не распознаёт progressive
     JPEG (частый случай для картинок из static/CMS-выгрузок) и падает с
     UnrecognizedImageError, хотя файл абсолютно валиден. Прогоняем через
     Pillow и пересохраняем в надёжном baseline-формате перед вставкой.
+    Заодно отдаём исходные пиксельные размеры — нужны, чтобы вписать
+    изображение в ячейку с сохранением пропорций.
     """
-    from PIL import Image
-
     with Image.open(image_path) as im:
+        width_px, height_px = im.size
         im = im.convert("RGB") if im.mode not in ("RGB", "RGBA") else im
         buf = io.BytesIO()
         fmt = "PNG" if im.mode == "RGBA" else "JPEG"
         im.save(buf, format=fmt)
         buf.seek(0)
-        return buf
+        return buf, width_px, height_px
 
 
-def _add_product_block(doc: Document, image_path: str, spec_rows: Iterable[tuple[str, str]]) -> None:
+def _fit_box(
+    img_w_px: int,
+    img_h_px: int,
+    box_w_cm: float,
+    box_h_cm: float,
+) -> tuple[float, float]:
+    """Пропорциональное вписывание картинки в прямоугольник box_w x box_h
+    (касание только двух стенок, без обрезки и искажения — classic
+    "contain" fit)."""
+    img_ratio = img_w_px / img_h_px
+    box_ratio = box_w_cm / box_h_cm
+    if img_ratio >= box_ratio:
+        return box_w_cm, box_w_cm / img_ratio
+
+    return box_h_cm * img_ratio, box_h_cm
+
+
+PRODUCT_IMAGE_BOX_W_CM = 7.77
+PRODUCT_IMAGE_BOX_H_CM = 6.04
+
+PRODUCT_IMAGE_FIT_MARGIN_CM = 0.3
+PRODUCT_IMAGE_FIT_W_CM = PRODUCT_IMAGE_BOX_W_CM - PRODUCT_IMAGE_FIT_MARGIN_CM
+PRODUCT_IMAGE_FIT_H_CM = PRODUCT_IMAGE_BOX_H_CM - PRODUCT_IMAGE_FIT_MARGIN_CM
+
+
+def _add_product_block(
+    doc: DocumentType,
+    image_path: str,
+    spec_rows: Iterable[tuple[str, str]],
+    *,
+    left_cm: float = 1.5,
+    right_cm: float = 1.5,
+) -> None:
     """
     Таблица 'картинка | подпись | значение' — картинка изделия слева
     (объединена по вертикали на все строки), справа характеристики.
+    Это «таблица с описанием товара».
     """
     spec_rows = list(spec_rows)
     n_rows = len(spec_rows)
 
     table = doc.add_table(rows=n_rows, cols=3)
     table.style = "Table Grid"
-    table.alignment = WD_TABLE_ALIGNMENT.CENTER
-    table.autofit = False
 
-    col_widths = (Cm(6.0), Cm(6.0), Cm(4.0))
+    total_width = PAGE_WIDTH_CM - left_cm - right_cm
+    img_col_w = PRODUCT_IMAGE_BOX_W_CM
+    remaining_w = total_width - img_col_w
+    label_col_w = remaining_w * 0.6
+    value_col_w = remaining_w - label_col_w
+    _set_table_edge_indent(
+        table,
+        left_cm,
+        right_cm,
+        [img_col_w, label_col_w, value_col_w],
+    )
+
+    # Точная высота строк, чтобы объединённая ячейка с фото была ровно 6.04 см
+    row_height = Cm(PRODUCT_IMAGE_BOX_H_CM / n_rows)
     for row in table.rows:
-        for cell, w in zip(row.cells, col_widths):
-            cell.width = w
+        row.height = row_height
+        row.height_rule = WD_ROW_HEIGHT_RULE.EXACTLY
 
     # Объединяем картиночную колонку по вертикали
     img_cell = table.cell(0, 0)
     if n_rows > 1:
         img_cell = img_cell.merge(table.cell(n_rows - 1, 0))
+
+    img_cell.width = Cm(img_col_w)
     img_cell.vertical_alignment = 1  # center
     img_para = img_cell.paragraphs[0]
+    _zero_spacing(img_para)
     img_para.alignment = WD_ALIGN_PARAGRAPH.CENTER
     run = img_para.add_run()
     try:
-        run.add_picture(_safe_image_stream(image_path), width=Cm(5.5))
+        stream, px_w, px_h = _safe_image_stream(image_path)
+        fit_w, fit_h = _fit_box(
+            px_w,
+            px_h,
+            PRODUCT_IMAGE_FIT_W_CM,
+            PRODUCT_IMAGE_FIT_H_CM,
+        )
+        run.add_picture(stream, width=Cm(fit_w), height=Cm(fit_h))
     except Exception:
         # если файл картинки не найден/битый — не роняем генерацию документа
         placeholder = img_para.add_run("[изображение недоступно]")
-        _set_font(placeholder, size=9)
+        _set_font(placeholder, size=NORMAL_FONT_SIZE)
 
     for i, (label, value) in enumerate(spec_rows):
         label_cell = table.cell(i, 1)
         value_cell = table.cell(i, 2)
 
         lp = label_cell.paragraphs[0]
+        _zero_spacing(lp)
         lr = lp.add_run(label)
-        _set_font(lr, size=10)
+        _set_font(lr)
 
         vp = value_cell.paragraphs[0]
+        _zero_spacing(vp)
         vr = vp.add_run(str(value))
-        _set_font(vr, size=10, bold=True)
+        _set_font(vr, bold=True)
 
-    doc.add_paragraph()
+    spacer = doc.add_paragraph()
+    _zero_spacing(spacer)
 
 
-# --------------------------------------------------------------------------
 # Сборка блоков "Портал" и "Глухарь"
-# --------------------------------------------------------------------------
-
-
-def _add_portal_section(doc: Document, portal, index: int) -> Decimal:
+def _add_portal_section(doc: DocumentType, portal) -> Decimal:
     scheme = portal.scheme
-    letter = SCHEME_LETTERS[index % len(SCHEME_LETTERS)]
-    _add_heading(doc, f"Схема {letter}. {scheme.name}.")
+    letter = get_scheme_letter(scheme)
+    _add_heading(doc, f"Схема {letter}. HS-портал", size=HEADING_FONT_SIZE)
 
     width = portal.width
     height = portal.height
     amount = portal.amount
-    area_total = (_to_decimal(width) * _to_decimal(height) / Decimal("1000000")) * _to_decimal(amount)
+    area_total = (
+        _to_decimal(width) * _to_decimal(height) / Decimal("1000000")
+    ) * _to_decimal(amount)
     price = get_product_price(portal)
 
     spec_rows = [
@@ -345,13 +527,15 @@ def _add_portal_section(doc: Document, portal, index: int) -> Decimal:
     return price
 
 
-def _add_glukhar_section(doc: Document, glukhar, index: int) -> Decimal:
-    _add_heading(doc, "Глухое окно" if index == 0 else f"Глухое окно ({index + 1})")
+def _add_glukhar_section(doc: DocumentType, glukhar, index: int) -> Decimal:
+    _add_heading(doc, "Глухое окно", size=HEADING_FONT_SIZE)
 
     width = glukhar.width
     height = glukhar.height
     amount = glukhar.amount
-    area_total = (_to_decimal(width) * _to_decimal(height) / Decimal("1000000")) * _to_decimal(amount)
+    area_total = (
+        _to_decimal(width) * _to_decimal(height) / Decimal("1000000")
+    ) * _to_decimal(amount)
     price = get_product_price(glukhar)
 
     spec_rows = [
@@ -361,7 +545,7 @@ def _add_glukhar_section(doc: Document, glukhar, index: int) -> Decimal:
         ("Площадь изделий, м\u00b2", _fmt_area(area_total)),
         ("Стоимость изделий, рублей", _fmt_money(price)),
     ]
-    _add_product_block(doc, get_glukhar_image_path(glukhar), spec_rows)
+    _add_product_block(doc, GLUKHAR_IMAGE, spec_rows)
 
     wood_name = getattr(glukhar.wood_type, "name", "-")
     _add_kv_table(
@@ -375,68 +559,127 @@ def _add_glukhar_section(doc: Document, glukhar, index: int) -> Decimal:
     return price
 
 
-# --------------------------------------------------------------------------
 # Шапка и итоговый блок
-# --------------------------------------------------------------------------
+HEADER_TEXT_LEFT_CM = 2.5
+HEADER_TEXT_RIGHT_CM = 1.5
+LOGO_CELL_CM = 2.75
+LOGO_TABLE_RIGHT_CM = 1.5
+
+DATES_LEFT_CM = 2.5
+DATES_RIGHT_CM = 1.5
+DATES_LEFT_COL_CM = 3.5
 
 
 def _add_document_header(
-    doc: Document,
+    doc: DocumentType,
     company_name: str,
     inn: str,
     ogrn: str,
     proposal_date: str,
     shipment_term: str,
 ) -> None:
+    # Блок реквизитов (слева) + блок с логотипом (справа) — одна строка,
+    # позиционированная так, чтобы текстовый блок начинался в 2.5 см от
+    # левого края листа, а таблица с логотипом заканчивалась в 1.5 см от
+    # правого края листа (оба требования выполняются одновременно, т.к.
+    # это один и тот же ряд с общими левым/правым отступами).
     table = doc.add_table(rows=1, cols=2)
-    table.autofit = False
-    table.columns[0].width = Cm(12.0)
-    table.columns[1].width = Cm(4.0)
+    total_width = PAGE_WIDTH_CM - HEADER_TEXT_LEFT_CM - LOGO_TABLE_RIGHT_CM
+    text_col_w = total_width - LOGO_CELL_CM
+    _set_table_edge_indent(
+        table,
+        HEADER_TEXT_LEFT_CM,
+        LOGO_TABLE_RIGHT_CM,
+        [text_col_w - 1.5, LOGO_CELL_CM + 1.5],
+    )
 
     left_cell = table.cell(0, 0)
     p = left_cell.paragraphs[0]
+    _zero_spacing(p)
     r = p.add_run("КОММЕРЧЕСКОЕ ПРЕДЛОЖЕНИЕ")
-    _set_font(r, size=16, bold=True)
+    _set_font(r, bold=True)
 
     p2 = left_cell.add_paragraph()
+    _zero_spacing(p2)
     r2 = p2.add_run(company_name)
-    _set_font(r2, size=10)
+    _set_font(r2)
 
     p3 = left_cell.add_paragraph()
+    _zero_spacing(p3)
     r3 = p3.add_run(f"ИНН {inn}")
-    _set_font(r3, size=10)
+    _set_font(r3)
 
     p4 = left_cell.add_paragraph()
+    _zero_spacing(p4)
     r4 = p4.add_run(f"ОГРН {ogrn}")
-    _set_font(r4, size=10)
+    _set_font(r4)
 
     right_cell = table.cell(0, 1)
+    right_cell.width = Cm(LOGO_CELL_CM)
     rp = right_cell.paragraphs[0]
-    rp.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+    _zero_spacing(rp)
+    rp.alignment = WD_ALIGN_PARAGRAPH.CENTER
     rrun = rp.add_run()
-    if os.path.exists(COMPANY_LOGO):
+    if COMPANY_LOGO and os.path.exists(COMPANY_LOGO):
         try:
-            rrun.add_picture(COMPANY_LOGO, width=Cm(2.6))
+            rrun.add_picture(COMPANY_LOGO, width=Cm(LOGO_CELL_CM))
         except Exception:
             pass
 
-    doc.add_paragraph()
+    spacer = doc.add_paragraph()
+    _zero_spacing(spacer)
+
+    # Таблица с датами («Дата КП:» / «Срок отгрузки:»)
+    dates_total_width = PAGE_WIDTH_CM - DATES_LEFT_CM - DATES_RIGHT_CM
+    dates_right_col_cm = dates_total_width - DATES_LEFT_COL_CM
 
     meta_table = doc.add_table(rows=2, cols=2)
     meta_table.style = "Table Grid"
+    _set_table_edge_indent(
+        meta_table,
+        DATES_LEFT_CM,
+        DATES_RIGHT_CM,
+        [DATES_LEFT_COL_CM, dates_right_col_cm],
+    )
+
     meta_rows = [("Дата КП:", proposal_date), ("Срок отгрузки:", shipment_term)]
     for i, (label, value) in enumerate(meta_rows):
         c0, c1 = meta_table.rows[i].cells
-        r0 = c0.paragraphs[0].add_run(label)
-        _set_font(r0, size=10, bold=True)
-        r1 = c1.paragraphs[0].add_run(value)
-        _set_font(r1, size=10)
 
-    doc.add_paragraph()
+        # Левый столбец — совсем без границ, правый — со всеми границами.
+        _set_cell_borders(c0, top="none", bottom="none", left="none", right="single")
+        _set_cell_borders(
+            c1,
+            top="single",
+            bottom="single",
+            left="single",
+            right="single",
+        )
+
+        p0 = c0.paragraphs[0]
+        _zero_spacing(p0)
+        p0.alignment = WD_ALIGN_PARAGRAPH.RIGHT
+        r0 = p0.add_run(label)
+        _set_font(r0)
+
+        p1 = c1.paragraphs[0]
+        _zero_spacing(p1)
+        p1.alignment = WD_ALIGN_PARAGRAPH.LEFT
+        r1 = p1.add_run(value)
+        _set_font(r1)
+
+    spacer2 = doc.add_paragraph()
+    _zero_spacing(spacer2)
+
+
+COST_LEFT_CM = 1.5
+COST_RIGHT_CM = 1.5
+PAYMENT_LEFT_CM = 1.5
+PAYMENT_RIGHT_CM = 1.5
 
 
 def _add_totals_block(
-    doc: Document,
+    doc: DocumentType,
     items_total: Decimal,
     items_count: int,
     installation: Decimal,
@@ -444,38 +687,68 @@ def _add_totals_block(
     unloading: Decimal,
     grand_total: Decimal,
 ) -> None:
-    _add_heading(doc, "Стоимость заказа:")
+    _add_heading(
+        doc,
+        "Стоимость заказа:",
+        bold=True,
+        size=HEADING_FONT_SIZE,
+        left_cm=COST_LEFT_CM,
+        right_cm=COST_RIGHT_CM,
+    )
 
-    table = doc.add_table(rows=4, cols=2)
-    table.style = "Table Grid"
+    # Стоимость заказа — единая таблица (позиции + «Итого:» одной строкой).
     rows = [
-        (f"Стоимость изделий, {items_count} шт", _fmt_money(items_total)),
-        ("Монтаж", _fmt_money(installation)),
-        ("Доставка", _fmt_money(delivery)),
-        ("Разгрузка", _fmt_money(unloading)),
+        (f"Стоимость изделий, {items_count} шт", _fmt_money(items_total), False),
+        ("Монтаж", _fmt_money(installation), False),
+        ("Доставка", _fmt_money(delivery), False),
+        ("Разгрузка", _fmt_money(unloading), False),
+        ("Итого:", _fmt_money(grand_total), True),
     ]
-    for i, (label, value) in enumerate(rows):
+
+    table = doc.add_table(rows=len(rows), cols=2)
+    table.style = "Table Grid"
+    total_width = PAGE_WIDTH_CM - COST_LEFT_CM - COST_RIGHT_CM
+    label_w = total_width * 0.7
+    value_w = total_width - label_w
+    _set_table_edge_indent(table, COST_LEFT_CM, COST_RIGHT_CM, [label_w, value_w])
+
+    for i, (label, value, is_total) in enumerate(rows):
         c0, c1 = table.rows[i].cells
-        r0 = c0.paragraphs[0].add_run(label)
-        _set_font(r0, size=10)
-        r1 = c1.paragraphs[0].add_run(value)
-        _set_font(r1, size=10, bold=True)
 
-    doc.add_paragraph()
+        p0 = c0.paragraphs[0]
+        _zero_spacing(p0)
+        r0 = p0.add_run(label)
+        _set_font(r0, bold=is_total)
 
-    total_table = doc.add_table(rows=1, cols=2)
-    total_table.style = "Table Grid"
-    c0, c1 = total_table.rows[0].cells
-    r0 = c0.paragraphs[0].add_run("Итого:")
-    _set_font(r0, size=12, bold=True)
-    r1 = c1.paragraphs[0].add_run(_fmt_money(grand_total))
-    _set_font(r1, size=12, bold=True)
+        p1 = c1.paragraphs[0]
+        _zero_spacing(p1)
+        r1 = p1.add_run(value)
+        _set_font(r1, bold=True)
 
-    doc.add_paragraph()
+    spacer = doc.add_paragraph()
+    _zero_spacing(spacer)
 
-    _add_heading(doc, "График платежей:")
+    _add_heading(
+        doc,
+        "График платежей:",
+        bold=True,
+        size=HEADING_FONT_SIZE,
+        left_cm=PAYMENT_LEFT_CM,
+        right_cm=PAYMENT_RIGHT_CM,
+    )
+
     pay_table = doc.add_table(rows=2, cols=2)
     pay_table.style = "Table Grid"
+    pay_total_width = PAGE_WIDTH_CM - PAYMENT_LEFT_CM - PAYMENT_RIGHT_CM
+    pay_label_w = pay_total_width * 0.7
+    pay_value_w = pay_total_width - pay_label_w
+    _set_table_edge_indent(
+        pay_table,
+        PAYMENT_LEFT_CM,
+        PAYMENT_RIGHT_CM,
+        [pay_label_w, pay_value_w],
+    )
+
     first_payment = (grand_total * Decimal("0.7")).quantize(Decimal("0.01"))
     second_payment = (grand_total - first_payment).quantize(Decimal("0.01"))
     pay_rows = [
@@ -484,17 +757,19 @@ def _add_totals_block(
     ]
     for i, (label, value) in enumerate(pay_rows):
         c0, c1 = pay_table.rows[i].cells
-        r0 = c0.paragraphs[0].add_run(label)
-        _set_font(r0, size=10)
-        r1 = c1.paragraphs[0].add_run(value)
-        _set_font(r1, size=10, bold=True)
+
+        p0 = c0.paragraphs[0]
+        _zero_spacing(p0)
+        r0 = p0.add_run(label)
+        _set_font(r0)
+
+        p1 = c1.paragraphs[0]
+        _zero_spacing(p1)
+        r1 = p1.add_run(value)
+        _set_font(r1, bold=True)
 
 
-# --------------------------------------------------------------------------
 # Точка входа
-# --------------------------------------------------------------------------
-
-
 def build_commercial_proposal(
     order,
     *,
@@ -517,27 +792,41 @@ def build_commercial_proposal(
     if proposal_date is None:
         # НАСТРОЙКА: если нужна другая дата (например order.created_at),
         # передайте её явно через параметр proposal_date.
-        from datetime import date
-
         proposal_date = date.today().strftime("%d.%m.%y")
 
     doc = Document()
+    _configure_normal_style(doc)
+
     section = doc.sections[0]
-    section.left_margin = Cm(1.5)
-    section.right_margin = Cm(1.5)
+    section.page_width = Cm(PAGE_WIDTH_CM)
+    section.page_height = Cm(PAGE_HEIGHT_CM)
+    section.top_margin = Cm(2.0)
+    section.bottom_margin = Cm(1.0)
+    # Поля слева/справа = 0: все отступы блоков ниже заданы абсолютно
+    # («от края листа»), а не «от границ текста», поэтому поля страницы
+    # сами по себе не должны создавать дополнительный отступ.
+    section.left_margin = Cm(0)
+    section.right_margin = Cm(0)
 
     _add_document_header(doc, company_name, inn, ogrn, proposal_date, shipment_term)
 
-    portals = list(order.portal_set.select_related("scheme", "wood_type", "hardware_type", "color_type").all())
+    portals = list(
+        order.portal_set.select_related(
+            "scheme",
+            "wood_type",
+            "hardware_type",
+            "color_type",
+        ).all(),
+    )
     glukhars = list(order.glukhar_set.select_related("wood_type", "color_type").all())
 
     items_total = Decimal("0")
     items_count = 0
 
-    for i, portal in enumerate(portals):
-        items_total += get_product_price(portal) 
+    for portal in portals:
+        items_total += get_product_price(portal)
         items_count += portal.amount
-        _add_portal_section(doc, portal, i)
+        _add_portal_section(doc, portal)
 
     for i, glukhar in enumerate(glukhars):
         items_total += get_product_price(glukhar)
@@ -548,11 +837,9 @@ def build_commercial_proposal(
     delivery = _to_decimal(order.delivery)
     unloading = _to_decimal(order.unloading)
 
-    # НАСТРОЙКА: если хотите пересчитывать итог сами (а не брать
-    # готовое order.total_sum), раскомментируйте строку ниже и
-    # примените вашу логику скидки (order.discount).
-    # grand_total = items_total + installation + delivery + unloading
-    grand_total = _to_decimal(order.total_sum) or (items_total + installation + delivery + unloading)
+    grand_total = _to_decimal(order.total_sum) or (
+        items_total + installation + delivery + unloading
+    )
 
     _add_totals_block(
         doc,

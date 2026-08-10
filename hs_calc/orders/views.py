@@ -129,7 +129,7 @@ class OrderDownloadKPView(ManagerRequiredMixin, View):
             ),
         )
         response["Content-Disposition"] = (
-            f'attachment; filename="KP_order_{order.pk}.docx"'
+            f'attachment; filename="KP_zakaz_{order.pk}.docx"'
         )
         return response
 

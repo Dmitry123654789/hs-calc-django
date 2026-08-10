@@ -806,8 +806,9 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
                 common_length = mul_dict(has_w_list) + mul_dict(has_h_list)
 
                 result[scheme][beam] = {
-                    "carpenter":
-                        dec_ceil(common_length * beam_price_carpenter / THOUSAND),
+                    "carpenter": dec_ceil(
+                        common_length * beam_price_carpenter / THOUSAND,
+                    ),
                     "painter": dec_ceil(common_length * beam_price_painter / THOUSAND),
                 }
                 continue
