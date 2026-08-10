@@ -146,7 +146,7 @@
                                         </thead>
                                         <tbody>
                                             {% for detail, costs in labor_details.items %}
-                                            <tr class="labor-row" data-stolyar="{{ costs.carpenter }}" data-malyar="{{ costs.painter }}">
+                                            <tr class="labor-row" data-carpenter="{{ costs.carpenter }}" data-painter="{{ costs.painter }}">
                                                 <td>{{ detail|get_or_self:replace_dict }}</td>
                                                 <td>{{ costs.carpenter }}</td>
                                                 <td>{{ costs.painter }}</td>
@@ -154,8 +154,8 @@
                                             {% endfor %}
                                             <tr class="table-secondary fw-bold total-row">
                                                 <td>ИТОГО ЗА 1 ШТ.</td>
-                                                <td class="total-stolyar-cell">0.00</td>
-                                                <td class="total-malyar-cell">0.00</td>
+                                                <td class="total-carpenter-cell">0.00</td>
+                                                <td class="total-painter-cell">0.00</td>
                                             </tr>
                                         </tbody>
                                     </table>
@@ -421,18 +421,18 @@
         // таблицы) и не требует данных из calculation_details.
         document.querySelectorAll(".labor-table").forEach(function(table) {
             const rows = table.querySelectorAll("tbody tr.labor-row");
-            let totalStolyar = 0;
-            let totalMalyar = 0;
+            let totalCarpenter = 0;
+            let totalPainter = 0;
 
             rows.forEach(function(row) {
-                totalStolyar += parseFloat(row.getAttribute("data-stolyar").replace(',', '.')) || 0;
-                totalMalyar += parseFloat(row.getAttribute("data-malyar").replace(',', '.')) || 0;
+                totalCarpenter += parseFloat(row.getAttribute("data-carpenter").replace(',', '.')) || 0;
+                totalPainter += parseFloat(row.getAttribute("data-painter").replace(',', '.')) || 0;
             });
 
-            const stolyarCell = table.querySelector(".total-stolyar-cell");
-            const malyarCell = table.querySelector(".total-malyar-cell");
-            if (stolyarCell) stolyarCell.textContent = totalStolyar.toFixed(2);
-            if (malyarCell) malyarCell.textContent = totalMalyar.toFixed(2);
+            const carpenterCell = table.querySelector(".total-carpenter-cell");
+            const painterCell = table.querySelector(".total-painter-cell");
+            if (carpenterCell) carpenterCell.textContent = totalCarpenter.toFixed(2);
+            if (painterCell) painterCell.textContent = totalPainter.toFixed(2);
         });
     });
 
@@ -443,7 +443,6 @@
         window.location.href = "{% url 'orders:download_kp' order.pk %}";
     }
 
-    // Функция-обертка для чтения значения селекта и запуска выгрузки
     function triggerExcelExport() {
         const selectElem = document.getElementById('excelExportType');
         const scope = selectElem ? selectElem.value : 'all';
@@ -561,9 +560,9 @@
                 const cells = row.querySelectorAll('td');
                 if (cells.length < 3) return;
                 const detail = cells[0].textContent.trim();
-                const stolyar = parseFloat(cells[1].textContent) || 0;
-                const malyar = parseFloat(cells[2].textContent) || 0;
-                data.push({ detail, stolyar: Math.round(stolyar), malyar: Math.round(malyar) });
+                const carpenter = parseFloat(cells[1].textContent) || 0;
+                const painter = parseFloat(cells[2].textContent) || 0;
+                data.push({ detail, carpenter: Math.round(carpenter), painter: Math.round(painter) });
             });
             return data;
         }
@@ -575,9 +574,9 @@
             const cells = totalRow.querySelectorAll('td');
             if (cells.length < 3) return null;
             const label = cells[0].textContent.trim();
-            const stolyar = parseFloat(cells[1].textContent) || 0;
-            const malyar = parseFloat(cells[2].textContent) || 0;
-            return { label, stolyar: Math.round(stolyar), malyar: Math.round(malyar) };
+            const carpenter = parseFloat(cells[1].textContent) || 0;
+            const painter = parseFloat(cells[2].textContent) || 0;
+            return { label, carpenter: Math.round(carpenter), painter: Math.round(painter) };
         }
 
         // Извлечение строк листа "глухарь" (5 колонок: Наименование, Цена, Размер, Кол-во, Сумма)
@@ -702,12 +701,12 @@
                     const data = extractLaborRows(table);
                     const total = getLaborTotal(table);
                     if (total) {
-                        data.push({ detail: total.label, stolyar: total.stolyar, malyar: total.malyar });
+                        data.push({ detail: total.label, carpenter: total.carpenter, painter: total.painter });
                     }
 
                     const wsData = [
                         ['Наименование', 'Работа столяра', 'Работа маляра'],
-                        ...data.map(row => [row.detail, row.stolyar, row.malyar])
+                        ...data.map(row => [row.detail, row.carpenter, row.painter])
                     ];
                     const amount = table.getAttribute('data-amount');
                     appendAmountRow(wsData, amount, 3);
@@ -723,7 +722,6 @@
                              'Полная_Спецификация';
         }
 
-        // 3. Глухари и допуслуги (только при all)
         if (scope === 'all') {
             addGlukharSheets(wb);
 

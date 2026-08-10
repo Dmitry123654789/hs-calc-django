@@ -154,8 +154,7 @@
         let baseTotalPrice = 0;
         let lastGrandTotal = 0;
         let savedOrderId = null;
-        // Шаблон ссылки на скачивание КП с плейсхолдером id=0, который
-        // подменяем на реальный order_id после сохранения заказа.
+        
         const downloadKpUrlTemplate = "{% url 'orders:download_kp' 0 %}";
 
         // ---------- Вспомогательные функции ----------

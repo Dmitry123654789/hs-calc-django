@@ -1,5 +1,6 @@
 from collections import Counter
 from decimal import Decimal, InvalidOperation, ROUND_CEILING, ROUND_HALF_UP
+from typing import Any
 
 from calculate.models import (
     Beams,
@@ -116,7 +117,7 @@ def decimal_to_number(value: Decimal):
     return float(value)
 
 
-def jsonify_result(data: Decimal | dict | list):
+def jsonify_result(data) -> Any:
     """Рекурсивно обходит структуру (dict/list/значения) и приводит
     все Decimal к обычным числам (int/float), чтобы в итоговом JSON
     они сохранялись как числа, а не как строки."""
@@ -375,12 +376,12 @@ def get_price_4k(has_rain: bool, portal_width, scheme_name: str, do_round=True) 
 
     fixed_sash = get_fixed_sash_amount(scheme_name)
     doors = get_door_amount(scheme_name)
-    stvorki = doors + fixed_sash
+    sashes = doors + fixed_sash
 
-    if stvorki == 0:
+    if sashes == 0:
         return zero_result
 
-    result = to_decimal(portal_width) / to_decimal(stvorki)
+    result = to_decimal(portal_width) / to_decimal(sashes)
 
     if result < LIMIT_3000 and do_round:
         result = dec_ceil(result / HUNDRED) * HUNDRED
@@ -396,9 +397,9 @@ def get_price_4k(has_rain: bool, portal_width, scheme_name: str, do_round=True) 
 def get_price_5k(has_rain: bool, portal_width, portal_height, scheme_name: str) -> dict:
     fixed_sash = get_fixed_sash_amount(scheme_name)
     doors = get_door_amount(scheme_name)
-    stvorki = doors + fixed_sash
+    sashes = doors + fixed_sash
 
-    if stvorki == 0:
+    if sashes == 0:
         return {
             "price": ZERO,
             "w_list": {},
@@ -411,7 +412,7 @@ def get_price_5k(has_rain: bool, portal_width, portal_height, scheme_name: str) 
     height = as_number(portal_height)
     amount_h = [height, height] * fixed_sash
 
-    half_w = int(dec_ceil(to_decimal(portal_width) / to_decimal(stvorki)))
+    half_w = int(dec_ceil(to_decimal(portal_width) / to_decimal(sashes)))
 
     price_h = to_decimal(len(amount_h)) * price * length / THOUSAND
 
@@ -449,15 +450,15 @@ def get_price_6k(has_rain: bool, portal_width, scheme_name: str) -> dict:
         }
 
     doors = get_door_amount(scheme_name)
-    stvorki = doors + get_fixed_sash_amount(scheme_name)
+    sashes = doors + get_fixed_sash_amount(scheme_name)
 
-    if stvorki == 0:
+    if sashes == 0:
         return {
             "price": ZERO,
             "w_list": {0: 0},
         }
 
-    result = dec_ceil(to_decimal(portal_width) / to_decimal(stvorki)) + ONE_HUNDRED_TEN
+    result = dec_ceil(to_decimal(portal_width) / to_decimal(sashes)) + ONE_HUNDRED_TEN
 
     if result < LIMIT_3000:
         result = dec_ceil(result / HUNDRED) * HUNDRED
@@ -472,15 +473,15 @@ def get_price_6k(has_rain: bool, portal_width, scheme_name: str) -> dict:
 
 def get_price_7k(has_rain: bool, portal_width, portal_height, scheme_name: str) -> dict:
     doors = get_door_amount(scheme_name)
-    stvorki = doors + get_fixed_sash_amount(scheme_name)
+    sashes = doors + get_fixed_sash_amount(scheme_name)
 
-    if stvorki == 0:
+    if sashes == 0:
         return {
             "price": ZERO,
             "h_list": {},
         }
 
-    w = int(dec_ceil(to_decimal(portal_width) / to_decimal(stvorki)) + ONE_HUNDRED_TEN)
+    w = int(dec_ceil(to_decimal(portal_width) / to_decimal(sashes)) + ONE_HUNDRED_TEN)
 
     height = as_number(portal_height)
     amount_h = [height, height] * doors
@@ -506,15 +507,15 @@ def get_price_7k(has_rain: bool, portal_width, portal_height, scheme_name: str) 
 
 def get_price_8k(portal_width, scheme_name: str, beam_id="8К") -> dict:
     doors = get_door_amount(scheme_name)
-    stvorki = doors + get_fixed_sash_amount(scheme_name)
+    sashes = doors + get_fixed_sash_amount(scheme_name)
 
-    if stvorki == 0:
+    if sashes == 0:
         return {
             "price": ZERO,
             "w_list": {0: 0},
         }
 
-    w = dec_ceil(to_decimal(portal_width) / to_decimal(stvorki)) + ONE_HUNDRED_TEN
+    w = dec_ceil(to_decimal(portal_width) / to_decimal(sashes)) + ONE_HUNDRED_TEN
 
     if w < LIMIT_3000:
         w = dec_ceil(w / HUNDRED) * HUNDRED
@@ -532,16 +533,16 @@ def get_price_8k(portal_width, scheme_name: str, beam_id="8К") -> dict:
 
 def get_price_9c(portal_width, portal_height, scheme_name: str) -> dict:
     doors = get_door_amount(scheme_name)
-    stvorki = doors + get_fixed_sash_amount(scheme_name)
+    sashes = doors + get_fixed_sash_amount(scheme_name)
 
-    if stvorki == 0:
+    if sashes == 0:
         return {
             "price": ZERO,
             "w_list": {},
             "h_list": {},
         }
 
-    w = int(dec_ceil(to_decimal(portal_width) / to_decimal(stvorki)))
+    w = int(dec_ceil(to_decimal(portal_width) / to_decimal(sashes)))
     height = as_number(portal_height)
 
     amount_h = [height, height] * doors
@@ -574,9 +575,9 @@ def get_price_11k(portal_width) -> dict:
 
 def get_price_12c(portal_width, portal_height, scheme_name: str) -> dict:
     doors = get_door_amount(scheme_name)
-    stvorki = doors + get_fixed_sash_amount(scheme_name)
+    sashes = doors + get_fixed_sash_amount(scheme_name)
 
-    if stvorki == 0:
+    if sashes == 0:
         return {
             "price": ZERO,
             "w_list": {},
@@ -586,7 +587,7 @@ def get_price_12c(portal_width, portal_height, scheme_name: str) -> dict:
     height = as_number(portal_height)
     amount_h = [height, height] * doors
 
-    w = int(dec_ceil(to_decimal(portal_width) / to_decimal(stvorki)) + ONE_HUNDRED_TEN)
+    w = int(dec_ceil(to_decimal(portal_width) / to_decimal(sashes)) + ONE_HUNDRED_TEN)
     amount_w = [w] * doors
 
     price = (
@@ -605,15 +606,15 @@ def get_price_12c(portal_width, portal_height, scheme_name: str) -> dict:
 
 def get_price_13c(portal_width, scheme_name: str) -> dict:
     doors = get_door_amount(scheme_name)
-    stvorki = doors + get_fixed_sash_amount(scheme_name)
+    sashes = doors + get_fixed_sash_amount(scheme_name)
 
-    if stvorki == 0:
+    if sashes == 0:
         return {
             "price": ZERO,
             "w_list": {},
         }
 
-    w = int(dec_ceil(to_decimal(portal_width) / to_decimal(stvorki)) + ONE_HUNDRED_TEN)
+    w = int(dec_ceil(to_decimal(portal_width) / to_decimal(sashes)) + ONE_HUNDRED_TEN)
     amount_w = [w] * doors
 
     price = to_decimal(len(amount_w)) * get_price("13С") * get_length("13С") / THOUSAND
@@ -716,9 +717,9 @@ def calculate_glass(
 
     doors_amount = get_door_amount(scheme_name)
     sashes_amount = get_fixed_sash_amount(scheme_name)
-    stvorki = doors_amount + sashes_amount
+    sashes = doors_amount + sashes_amount
 
-    if stvorki == 0:
+    if sashes == 0:
         return {
             "doors": {
                 "price": ZERO,
@@ -734,12 +735,12 @@ def calculate_glass(
 
     width_dec = to_decimal(portal_width)
     height_dec = to_decimal(portal_height)
-    stvorki_dec = to_decimal(stvorki)
+    sashes_dec = to_decimal(sashes)
 
-    glass_door_w = int(dec_round((width_dec / stvorki_dec) - glass_door_w_sub, 0))
+    glass_door_w = int(dec_round((width_dec / sashes_dec) - glass_door_w_sub, 0))
     glass_door_h = as_number(height_dec - GLASS_HEIGHT_DOOR_SUB)
 
-    sash_door_w = int(dec_round((width_dec / stvorki_dec) - glass_sash_w_sub, 0))
+    sash_door_w = int(dec_round((width_dec / sashes_dec) - glass_sash_w_sub, 0))
     sash_door_h = as_number(height_dec - GLASS_HEIGHT_SASH_SUB)
 
     glass_price = get_glass_price(glass_type)
@@ -830,7 +831,7 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
 
         door_amount = get_door_amount(scheme)
         sash_amount = get_fixed_sash_amount(scheme)
-        stvorki = door_amount + sash_amount
+        sashes = door_amount + sash_amount
         area = get_door_area(portal_width, portal_height, scheme)
 
         result[scheme]["sash"] = {
@@ -847,15 +848,15 @@ def calculate_work(workpiece: dict, portal_width, portal_height) -> dict:
 
         result[scheme]["packaging"] = {
             "carpenter": dec_ceil(
-                to_decimal(stvorki) * get_salary("package", "carpenter"),
+                to_decimal(sashes) * get_salary("package", "carpenter"),
             ),
-            "painter": dec_ceil(to_decimal(stvorki) * get_salary("package", "painter")),
+            "painter": dec_ceil(to_decimal(sashes) * get_salary("package", "painter")),
         }
 
     return result
 
 
-def summ_work(data: dict) -> dict:
+def sum_work(data: dict) -> dict:
     result = {
         "carpenter": ZERO,
         "painter": ZERO,
@@ -1006,7 +1007,7 @@ def calculate_beams(
     calculated_work = calculate_work(workpiece, width, height)[scheme]
     work_data[scheme] = calculated_work
 
-    work_result = summ_work(calculated_work)
+    work_result = sum_work(calculated_work)
 
     workpiece[scheme]["labor_carpenter"] = {
         "price": work_result["carpenter"],

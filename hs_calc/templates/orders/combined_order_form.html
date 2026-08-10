@@ -252,7 +252,7 @@
 {% block scripts %}
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const schemesData = JSON.parse('{{ schemes_json|escapejs }}');
+    const schemesData = JSON.parse('{{ schemes_json }}');
     const isAdmin = {{ is_admin|yesno:"true,false" }};
     const dealerPercentage = parseFloat('{{ dealer_percentage|default:0 }}') || 0;
 
@@ -290,8 +290,7 @@ document.addEventListener('DOMContentLoaded', function () {
     let baseTotalPrice = 0;
     let lastGrandTotal = 0;
     let savedOrderId = null;
-    // Шаблон ссылки на скачивание КП с плейсхолдером id=0, который
-    // подменяем на реальный order_id после сохранения заказа.
+    
     const downloadKpUrlTemplate = "{% url 'orders:download_kp' 0 %}";
 
     // ---------- Вспомогательные функции ----------
@@ -750,7 +749,7 @@ document.addEventListener('DOMContentLoaded', function () {
         saveOrder(this);
     });
 
-    // ---------- Навигация по визарду ----------
+    // ---------- Навигация ----------
     function goToStep(step) {
         currentStep = step;
 
