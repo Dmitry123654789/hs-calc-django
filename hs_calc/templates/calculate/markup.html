@@ -1,9 +1,14 @@
 {% extends "base.html" %}
+{% load dict_extras %}
 
 {% block title %}Наценка{% endblock %}
 
 {% block content %}
 <h1 class="h3 mb-4">Наценка на товары</h1>
+
+<div class="d-flex justify-content-end mb-3">
+  <button type="button" class="btn btn-primary btn-lg" id="saveAllBtn">Сохранить все</button>
+</div>
 
 <div class="row g-4">
   <div class="col-lg-6">
@@ -20,11 +25,8 @@
         <tr>
           <td>{{ scheme.name }}</td>
           <td>
-            <div class="input-group input-group-sm">
-              <input type="number" step="0.01" class="form-control ratio-input"
-                     data-type="scheme" data-id="{{ scheme.id }}" value="{{ scheme.ratio|stringformat:".2f" }}">
-              <button class="btn btn-outline-primary save-btn" type="button">Сохранить</button>
-            </div>
+            <input type="number" step="0.01" class="form-control form-control-sm ratio-input"
+                   data-type="scheme" data-id="{{ scheme.id }}" value="{{ scheme.ratio|stringformat:".2f" }}">
           </td>
         </tr>
         {% endfor %}
@@ -44,17 +46,86 @@
       <tbody>
         {% for ratio_obj in profit_ratios %}
         <tr>
-        {% if ratio_obj.name == "glukhar" %}
-            <td>Глухари</td>
-        {% else %}
-            <td>{{ ratio_obj.name }}</td>
-        {% endif %}
-          
+          <td>{{ ratio_obj.name|get_or_self:ratio_labels }}</td>
+          <td>
+            <input type="number" step="0.01" class="form-control form-control-sm ratio-input"
+                   data-type="profit_ratio" data-id="{{ ratio_obj.id }}" value="{{ ratio_obj.ratio|stringformat:".2f" }}">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col-lg-4">
+    <h2 class="h5">Постоянные расходы</h2>
+    <table class="table table-bordered align-middle">
+      <thead>
+        <tr>
+          <th>Показатель</th>
+          <th style="width: 160px;">Значение</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for item in fixed_expenses %}
+        <tr>
+          <td>{{ item.name|get_or_self:fixed_expenses_labels }}</td>
+          <td>
+            <input type="number" step="1" min="0" class="form-control form-control-sm ratio-input"
+                   data-type="fixed_expenses" data-id="{{ item.id }}" value="{{ item.price }}">
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col-lg-4">
+    <h2 class="h5">Расчет прибыли</h2>
+    <table class="table table-bordered align-middle">
+      <thead>
+        <tr>
+          <th>Показатель</th>
+          <th style="width: 160px;">Значение, %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ratio_obj in profit_calc_ratios %}
+        <tr>
+          <td>{{ ratio_obj.name|get_or_self:ratio_labels }}</td>
           <td>
             <div class="input-group input-group-sm">
-              <input type="number" step="0.01" class="form-control ratio-input"
-                     data-type="profit_ratio" data-id="{{ ratio_obj.id }}" value="{{ ratio_obj.ratio|stringformat:".2f" }}">
-              <button class="btn btn-outline-primary save-btn" type="button">Сохранить</button>
+              <input type="number" step="0.01" min="0" max="100" class="form-control ratio-input"
+                     data-type="profit_ratio" data-percent="true" data-id="{{ ratio_obj.id }}"
+                     value="{{ ratio_obj.ratio|to_percent|stringformat:".2f" }}">
+              <span class="input-group-text">%</span>
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+
+  <div class="col-lg-4">
+    <h2 class="h5">Расчет вознаграждения</h2>
+    <table class="table table-bordered align-middle">
+      <thead>
+        <tr>
+          <th>Показатель</th>
+          <th style="width: 160px;">Значение, %</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for ratio_obj in reward_calc_ratios %}
+        <tr>
+          <td>{{ ratio_obj.name|get_or_self:ratio_labels }}</td>
+          <td>
+            <div class="input-group input-group-sm">
+              <input type="number" step="0.01" min="0" max="100" class="form-control ratio-input"
+                     data-type="profit_ratio" data-percent="true" data-id="{{ ratio_obj.id }}"
+                     value="{{ ratio_obj.ratio|to_percent|stringformat:".2f" }}">
+              <span class="input-group-text">%</span>
             </div>
           </td>
         </tr>
@@ -67,35 +138,65 @@
 
 {% block scripts %}
 <script>
-document.querySelectorAll(".save-btn").forEach((btn) => {
-  btn.addEventListener("click", () => {
-    const input = btn.closest(".input-group").querySelector(".ratio-input");
-    fetch("{% url 'calculate:markup' %}", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "X-CSRFToken": "{{ csrf_token }}",
-      },
-      body: JSON.stringify({
-        type: input.dataset.type,
-        id: input.dataset.id,
-        ratio: input.value,
-      }),
-    })
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.status === "success") {
-          btn.textContent = "Сохранено";
-          btn.classList.replace("btn-outline-primary", "btn-success");
-          setTimeout(() => {
-            btn.textContent = "Сохранить";
-            btn.classList.replace("btn-success", "btn-outline-primary");
-          }, 1200);
-        } else {
-          alert(data.message || "Ошибка сохранения");
-        }
-      })
-      .catch(() => alert("Ошибка сохранения"));
+const saveAllBtn = document.getElementById("saveAllBtn");
+const saveAllBtnOriginalText = saveAllBtn.textContent;
+
+function buildPayload(input) {
+  let value = input.value;
+  if (input.dataset.percent === "true") {
+    value = (parseFloat(value) || 0) / 100;
+  }
+  return {
+    type: input.dataset.type,
+    id: input.dataset.id,
+    value: value,
+  };
+}
+
+function saveInput(input) {
+  return fetch("{% url 'calculate:markup' %}", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "X-CSRFToken": "{{ csrf_token }}",
+    },
+    body: JSON.stringify(buildPayload(input)),
+  })
+    .then((r) => r.json())
+    .then((data) => ({ input, ok: data.status === "success", message: data.message }))
+    .catch(() => ({ input, ok: false, message: "Ошибка сети" }));
+}
+
+saveAllBtn.addEventListener("click", () => {
+  const inputs = Array.from(document.querySelectorAll(".ratio-input"));
+  if (!inputs.length) return;
+
+  saveAllBtn.disabled = true;
+  saveAllBtn.textContent = "Сохранение...";
+  inputs.forEach((input) => input.classList.remove("is-valid", "is-invalid"));
+
+  Promise.all(inputs.map(saveInput)).then((results) => {
+    const errors = [];
+
+    results.forEach(({ input, ok, message }) => {
+      input.classList.add(ok ? "is-valid" : "is-invalid");
+      if (!ok) errors.push(message || "Ошибка сохранения");
+    });
+
+    saveAllBtn.disabled = false;
+
+    if (errors.length === 0) {
+      saveAllBtn.textContent = "Сохранено ✓";
+      saveAllBtn.classList.replace("btn-primary", "btn-success");
+      setTimeout(() => {
+        saveAllBtn.textContent = saveAllBtnOriginalText;
+        saveAllBtn.classList.replace("btn-success", "btn-primary");
+        inputs.forEach((input) => input.classList.remove("is-valid"));
+      }, 1500);
+    } else {
+      saveAllBtn.textContent = saveAllBtnOriginalText;
+      alert(`Сохранено ${results.length - errors.length} из ${results.length}.\n` + errors.join("\n"));
+    }
   });
 });
 </script>

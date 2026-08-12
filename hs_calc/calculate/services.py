@@ -5,11 +5,13 @@ from typing import Any
 from calculate.models import (
     Beams,
     Color,
+    FixedExpenses,
     Glass,
     GlukharGlass,
     GlukharWood,
     Hardware,
     PortalWood,
+    ProfitRatio,
     Scheme,
     Work,
 )
@@ -92,6 +94,68 @@ def dec_ceil(value, places: int | None = None) -> Decimal:
 
 def money(value) -> Decimal:
     return dec_round(value, 2)
+
+
+def get_revenue_tax_ratio() -> Decimal:
+    """Налог с выручки: запись Calculate.ProfitRatio с name="revenue"."""
+    return to_decimal(ProfitRatio.objects.get(name="revenue").ratio)
+
+
+def calculate_dealer_amount(raw_total, final_total) -> Decimal:
+    tax_ratio = get_revenue_tax_ratio()
+    return money(to_decimal(raw_total) - to_decimal(final_total) * tax_ratio)
+
+
+def sum_calc_totals(calc_results: dict, items: list) -> tuple[Decimal, Decimal]:
+    """Считает (raw_total, total_area) по результатам расчета
+    (calculate_portals/calculate_glukhar) и списку позиций формы
+    (items, каждая с ключами "name"/"amount").
+
+    - raw_total: сумма поля "total" (уже с учетом кол-ва, но без
+      коэффициента схемы/профита) по всем позициям.
+    - total_area: суммарная площадь всех изделий - "area" (площадь
+      1 шт.) * "amount" по каждой позиции.
+    """
+    raw_total = ZERO
+    total_area = ZERO
+
+    for item in items:
+        result = calc_results.get(item["name"], {})
+        raw_total += to_decimal(result.get("total", 0))
+        total_area += to_decimal(result.get("area", 0)) * to_decimal(
+            item.get("amount", 0),
+        )
+
+    return raw_total, total_area
+
+
+def get_fixed_expenses_per_area() -> Decimal:
+    """Постоянные расходы на единицу площади: monthly_expenses /
+    monthly_efficiency из единственной записи Calculate.FixedExpenses."""
+    monthly_efficiency = FixedExpenses.objects.get(name="monthly_efficiency").price
+    monthly_expenses = FixedExpenses.objects.get(name="monthly_expenses").price
+
+    return to_decimal(monthly_expenses) / to_decimal(monthly_efficiency)
+
+
+def calculate_order_profit(
+    total_sum,
+    raw_total,
+    extra_services,
+    discount,
+    dealer_amount,
+    total_area,
+) -> Decimal:
+    fixed_expenses_share = get_fixed_expenses_per_area() * to_decimal(total_area)
+
+    return money(
+        to_decimal(total_sum)
+        - to_decimal(raw_total)
+        - to_decimal(extra_services)
+        - to_decimal(discount)
+        - to_decimal(dealer_amount)
+        - fixed_expenses_share,
+    )
 
 
 def as_number(value):

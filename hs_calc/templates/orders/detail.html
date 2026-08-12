@@ -194,7 +194,7 @@
                                                     <td>{% widthratio scheme_data.labor_painter.price 1 product.amount %}</td>
                                                 </tr>
                                                 <tr class="table-secondary fw-bold">
-                                                    <td>ИТОГО (с коэффициентом)</td>
+                                                    <td>ИТОГО</td>
                                                     <td>{{ product.calculation_details.total_with_ratio }}</td>
                                                 </tr>
                                             </tbody>
@@ -315,19 +315,18 @@
                         <td class="text-danger fw-bold">-{{ order.discount }} руб.</td>
                         <td>{{ order.delivery }} руб.</td>
                         <td>{{ order.unloading }} руб.</td>
-                        <td id="install-rate" data-rate="{{ order.installation }}">{{ order.installation }} руб.</td>
-                        <td id="install-total">0.00 руб.</td>
+                        <td id="install-rate">{{ order.installation }} руб.</td>
+                        <td id="install-total">{{ order.installation_cost }} руб.</td>
                     </tr>
                     <tr class="table-light fw-bold">
                         <th colspan="2">Итого по заказу</th>
                         <th>Процент дилера</th>
-                        <th>Сумма дилера</th>
                         <th>Создал</th>
+                        <th>Прибыль</th>
                     </tr>
                     <tr class="fs-5">
                         <td colspan="2" class="fw-bold table-success">{{ order.total_sum }} руб.</td>
-                        <td>{{ order.percentage_worker }}%</td>
-                        <td>{{ dealer_amount }} руб.</td>
+                        <td>{{ order.percentage_worker }}руб</td>
                         <td>
                             {% if user.profile.is_director %}
                             <a href="{% url 'users:admin_user_detail' order.creator.pk %}">
@@ -337,6 +336,7 @@
                                 {{ order.creator.get_full_name|default:order.creator.username }}
                             {% endif %}
                         </td>
+                        <td class="fw-bold text-success">{{ order.profit }} руб.</td>
                     </tr>
                 </tbody>
             </table>
@@ -349,34 +349,6 @@
 <script src="{% static 'js/xlsx.full.min.js' %}"></script>
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        // Подсчет площади изделий и стоимости установки.
-        // Площадь 1 шт. уже посчитана на бэкенде (calculation_details.area)
-        // и выведена в шаблоне — здесь только суммируем ее по заказу.
-        let totalArea = 0;
-        let processedProducts = new Set();
-
-        document.querySelectorAll('.product-header').forEach(function(header) {
-            const productId = header.getAttribute('data-product-id');
-            const area = parseFloat(header.getAttribute('data-area').replace(',', '.')) || 0;
-            const amount = parseFloat(header.getAttribute('data-amount')) || 1;
-            const totalProductArea = area * amount;
-
-            // Избегаем двойного учета площади для порталов из-за наличия трех вкладок
-            if (productId && !processedProducts.has(productId)) {
-                totalArea += totalProductArea;
-                processedProducts.add(productId);
-            }
-        });
-
-        // Расчет общей стоимости установки в таблице итогов
-        const rateCell = document.getElementById('install-rate');
-        const totalCell = document.getElementById('install-total');
-        if (rateCell && totalCell) {
-            const rate = parseFloat(rateCell.getAttribute('data-rate')) || 0;
-            const installCost = totalArea * rate;
-            totalCell.textContent = installCost.toFixed(2) + ' руб.';
-        }
-
         // Подсчет rowspan для Порталов (Материалы).
         // Суммы ("ИТОГО ЗА 1 ШТ.") уже готовы на бэкенде и выведены
         // в шаблоне (calculation_details.materials_total) — здесь только

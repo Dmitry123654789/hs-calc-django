@@ -14,7 +14,7 @@
             <div class="card-body">
                 <div class="row g-3">
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">🌲 Материал:</label>
+                        <label class="form-label fw-bold">Материал:</label>
                         <select id="glukharMaterial" class="form-select" required>
                             <option value="сосна">Сосна</option>
                             <option value="дуб">Дуб</option>
@@ -22,14 +22,14 @@
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">🖌 Покраска:</label>
+                        <label class="form-label fw-bold">Покраска:</label>
                         <select id="glukharColor" class="form-select" required>
                             <option value="RAL">RAL</option>
                             <option value="Лесс">Лесс</option>
                         </select>
                     </div>
                     <div class="col-md-4">
-                        <label class="form-label fw-bold">👤 Покупатель:</label>
+                        <label class="form-label fw-bold">Покупатель:</label>
                         <select id="buyerSelect" class="form-select">
                             <option value="null">-- Без покупателя --</option>
                             <option value="new">+ Новый покупатель</option>
@@ -119,8 +119,9 @@
         let glukharArea = 0;
         let baseTotalPrice = 0;
         let lastGrandTotal = 0;
+        let installationCost = 0;
         let savedOrderId = null;
-        
+        let dealerAmount = 0;
         const downloadKpUrlTemplate = "{% url 'orders:download_kp' 0 %}";
 
         // ---------- Вспомогательные функции ----------
@@ -302,11 +303,12 @@
             html += `
             <div class="card mb-4 bg-light shadow-sm border-secondary">
                 <div class="card-body">
-                    <h5 class="card-title fw-bold mb-3">🚚 Дополнительные параметры заказа</h5>
+                    <h5 class="card-title fw-bold mb-3">Дополнительные параметры заказа</h5>
                     <div class="row g-3">
                         <div class="col-lg col-md-4">
                             <label class="form-label fw-bold small">Монтаж (руб/м²)</label>
                             <input type="number" class="form-control cost-input" id="installRate" min="0" value="12000">
+                            <div class="form-text small">Стоимость монтажа: <span id="installationCostValue" class="fw-bold">0</span> руб.</div>
                         </div>
                         <div class="col-lg col-md-4">
                             <label class="form-label fw-bold small">Доставка (руб)</label>
@@ -346,23 +348,43 @@
             document.getElementById('downloadKpBtn').addEventListener('click', downloadKp);
         }
 
-        function recalculateGrandTotal() {
+        async function recalculateGrandTotal() {
             const installRate = parseFloat(document.getElementById('installRate').value) || 0;
             const delivery = parseFloat(document.getElementById('deliveryCost').value) || 0;
             const unloading = parseFloat(document.getElementById('unloadingCost').value) || 0;
             const discount = parseFloat(document.getElementById('discountRate').value) || 0;
 
-            lastGrandTotal = baseTotalPrice + (glukharArea * installRate) + delivery + unloading - discount;
+            installationCost = Math.round(glukharArea * installRate * 100) / 100;
+            document.getElementById('installationCostValue').textContent =
+                installationCost.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2});
+
+            lastGrandTotal = baseTotalPrice + installationCost + delivery + unloading - discount;
 
             document.getElementById('dynamicGrandTotal').textContent =
                 `ИТОГО С УЧЕТОМ ДОП. УСЛУГ: ${lastGrandTotal.toLocaleString('ru-RU', {minimumFractionDigits: 2, maximumFractionDigits: 2})} руб.`;
 
             if (!isAdmin) {
-                const dealerAmount = Math.round(dealerPercentage / 100 * lastGrandTotal);
-                const dealerBlock = document.getElementById('dealerPercentageBlock');
-                if (dealerBlock) {
-                    dealerBlock.textContent = `Процент дилера (${dealerPercentage}%): ${dealerAmount.toLocaleString('ru-RU')} руб.`;
-                }
+                await updateDealerAmount();
+            }
+        }
+
+        // Сумма дилера считается в python (см. orders:dealer_amount),
+        // а не локально в JS.
+        async function updateDealerAmount() {
+            const dealerBlock = document.getElementById('dealerPercentageBlock');
+            if (!dealerBlock) return;
+
+            try {
+                const response = await fetch('{% url "orders:dealer_amount" %}', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json', 'X-CSRFToken': getCsrfToken() },
+                    body: JSON.stringify({ raw_total: baseTotalPrice, order_total: lastGrandTotal }),
+                });
+                const data = await response.json();
+                dealerAmount = Math.round(data.dealer_amount || 0);
+                dealerBlock.textContent = `Сумма дилера: ${dealerAmount.toLocaleString('ru-RU')} руб.`;
+            } catch (err) {
+                dealerBlock.textContent = '';
             }
         }
 
@@ -373,14 +395,17 @@
 
         // ---------- Сохранение заказа ----------
         async function saveOrder(btnElement) {
+            alert(dealerAmount.toString());
             const payload = {
                 buyer_id: buyerSelect.value,
                 installation: parseFloat(document.getElementById('installRate').value) || 0,
+                installation_cost: installationCost,
                 delivery: parseFloat(document.getElementById('deliveryCost').value) || 0,
                 unloading: parseFloat(document.getElementById('unloadingCost').value) || 0,
                 discount: parseInt(document.getElementById('discountRate').value) || 0,
                 order_total: lastGrandTotal,
                 glukhars: glukharsPayload,
+                dealerAmount: dealerAmount,
             };
 
             if (payload.buyer_id === 'new') {

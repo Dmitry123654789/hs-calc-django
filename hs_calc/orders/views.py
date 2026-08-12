@@ -18,7 +18,14 @@ from calculate.models import (
     ProfitRatio,
     Scheme,
 )
-from calculate.services import calculate_glukhar, calculate_portals
+from calculate.services import (
+    calculate_dealer_amount,
+    calculate_glukhar,
+    calculate_order_profit,
+    calculate_portals,
+    sum_calc_totals,
+    to_decimal,
+)
 from core.mixins import BackURLMixin, ManagerRequiredMixin, OnlyWorkerRequiredMixin
 from orders.kp_export import build_commercial_proposal
 from orders.models import Order
@@ -46,11 +53,16 @@ REPLACE_DICT = {
 }
 
 
-def calculate_dealer_percentage(user):
-    if user.profile.is_manager:
-        return user.profile.percentage_sale
+def to_money(value) -> Decimal:
+    """Приводит значение (из JSON-конфига фронтенда) к Decimal с
+    округлением до копеек, чтобы сохранять его в DecimalField-поля
+    вроде Order.installation_cost."""
+    try:
+        value = Decimal(str(value if value is not None else 0))
+    except Exception:
+        value = Decimal("0")
 
-    return 0
+    return value.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def serialize_product(instance):
@@ -71,6 +83,22 @@ def serialize_product(instance):
         result[str(field.verbose_name)] = value
 
     return result
+
+
+class DealerAmountView(ManagerRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        data = loads(request.body)
+
+        raw_total = data.get("raw_total", 0)
+        order_total = data.get("order_total", 0)
+
+        dealer_amount = (
+            calculate_dealer_amount(raw_total, order_total)
+            * self.request.user.profile.percentage_sale
+            / 100
+        )
+
+        return JsonResponse({"dealer_amount": float(dealer_amount)})
 
 
 class OrderListView(ListView, LoginRequiredMixin):
@@ -102,13 +130,6 @@ class OrderDetailView(BackURLMixin, ManagerRequiredMixin, DetailView):
         context["glukhars"] = self.object.glukhar_set.all()
         context["back_url"] = self.get_back_url()
 
-        dealer_percentage = self.object.percentage_worker or Decimal("0")
-        total_sum = self.object.total_sum or Decimal("0")
-        dealer_amount = (dealer_percentage / Decimal("100")) * total_sum
-        context["dealer_amount"] = dealer_amount.quantize(
-            Decimal("1"),
-            rounding=ROUND_HALF_UP,
-        )
         context["replace_dict"] = REPLACE_DICT
         return context
 
@@ -332,12 +353,32 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
         buyer_id = config.get("buyer_id")
 
         installation = int(config.get("installation", 0))
+        installation_cost = to_money(config.get("installation_cost", 0))
         delivery = int(config.get("delivery", 0))
         unloading = int(config.get("unloading", 0))
         discount = int(config.get("discount", 0))
 
         order_total = config.get("order_total", 0)
-        percentage_worker = calculate_dealer_percentage(request.user)
+        percentage_worker = config.get("dealerAmount", 0)
+
+        portal_raw_total, portal_area = sum_calc_totals(portal_calc_results, portals)
+        glukhar_raw_total, glukhar_area = sum_calc_totals(
+            glukhar_calc_results,
+            glukhars,
+        )
+        raw_total = portal_raw_total + glukhar_raw_total
+        total_area = portal_area + glukhar_area
+
+        dealer_amount = calculate_dealer_amount(raw_total, order_total)
+        extra_services = to_decimal(installation_cost) + delivery + unloading
+        profit = calculate_order_profit(
+            order_total,
+            raw_total,
+            extra_services,
+            discount,
+            dealer_amount,
+            total_area,
+        )
 
         buyer = None
         if buyer_id not in (None, "null", "new"):
@@ -351,12 +392,14 @@ class CombinedOrderSaveView(ManagerRequiredMixin, View):
             order = Order.objects.create(
                 delivery=delivery,
                 installation=installation,
+                installation_cost=installation_cost,
                 unloading=unloading,
                 discount=discount,
                 creator=request.user,
                 buyer=buyer,
                 percentage_worker=percentage_worker,
                 total_sum=order_total,
+                profit=profit,
             )
 
             for portal in portals:
@@ -448,12 +491,25 @@ class GlukharOrderSaveView(ManagerRequiredMixin, View):
         buyer_id = config["buyer_id"]
 
         installation = int(config.get("installation", 0))
+        installation_cost = to_money(config.get("installation_cost", 0))
         delivery = int(config.get("delivery", 0))
         unloading = int(config.get("unloading", 0))
         discount = int(config.get("discount", 0))
 
         order_total = config.get("order_total", 0)
-        percentage_worker = calculate_dealer_percentage(request.user)
+        percentage_worker = config.get("dealerAmount", 0)
+
+        raw_total, total_area = sum_calc_totals(calc_results, config["glukhars"])
+        dealer_amount = calculate_dealer_amount(raw_total, order_total)
+        extra_services = to_decimal(installation_cost) + delivery + unloading
+        profit = calculate_order_profit(
+            order_total,
+            raw_total,
+            extra_services,
+            discount,
+            dealer_amount,
+            total_area,
+        )
 
         buyer = None
         if buyer_id not in ["null", "new"]:
@@ -467,12 +523,14 @@ class GlukharOrderSaveView(ManagerRequiredMixin, View):
             order = Order.objects.create(
                 delivery=delivery,
                 installation=installation,
+                installation_cost=installation_cost,
                 unloading=unloading,
                 discount=discount,
                 creator=request.user,
                 buyer=buyer,
                 percentage_worker=percentage_worker,
                 total_sum=order_total,
+                profit=profit,
             )
 
             for glukhar in config["glukhars"]:
@@ -543,12 +601,25 @@ class PortalOrderSaveView(ManagerRequiredMixin, View):
         buyer_id = config["buyer_id"]
 
         installation = int(config.get("installation", 0))
+        installation_cost = to_money(config.get("installation_cost", 0))
         delivery = int(config.get("delivery", 0))
         unloading = int(config.get("unloading", 0))
         discount = int(config.get("discount", 0))
 
         order_total = config.get("order_total", 0)
-        percentage_worker = calculate_dealer_percentage(request.user)
+        percentage_worker = config.get("dealerAmount", 0)
+
+        raw_total, total_area = sum_calc_totals(calc_results, config["portals"])
+        dealer_amount = calculate_dealer_amount(raw_total, order_total)
+        extra_services = to_decimal(installation_cost) + delivery + unloading
+        profit = calculate_order_profit(
+            order_total,
+            raw_total,
+            extra_services,
+            discount,
+            dealer_amount,
+            total_area,
+        )
 
         buyer = None
         if buyer_id not in ["null", "new"]:
@@ -562,12 +633,14 @@ class PortalOrderSaveView(ManagerRequiredMixin, View):
             order = Order.objects.create(
                 delivery=delivery,
                 installation=installation,
+                installation_cost=installation_cost,
                 unloading=unloading,
                 discount=discount,
                 creator=request.user,
                 buyer=buyer,
                 percentage_worker=percentage_worker,
                 total_sum=order_total,
+                profit=profit,
             )
 
         with transaction.atomic():

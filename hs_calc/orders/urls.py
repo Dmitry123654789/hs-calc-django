@@ -36,4 +36,5 @@ urlpatterns = [
         views.OrderDownloadKPView.as_view(),
         name="download_kp",
     ),
+    path("dealer-amount/", views.DealerAmountView.as_view(), name="dealer_amount"),
 ]

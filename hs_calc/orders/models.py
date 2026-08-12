@@ -25,11 +25,17 @@ class Order(Model):
     )
     installation = PositiveIntegerField(
         verbose_name="Монтаж",
-        default=False,
+        default=0,
+    )
+    installation_cost = DecimalField(
+        verbose_name="Стоимость монтажа",
+        max_digits=11,
+        decimal_places=2,
+        default=0,
     )
     unloading = PositiveIntegerField(
         verbose_name="Разгрузка",
-        default=False,
+        default=0,
     )
     discount = DecimalField(
         verbose_name="Скидка",
@@ -67,6 +73,12 @@ class Order(Model):
     )
     total_sum = DecimalField(
         verbose_name="стоимость всего заказа",
+        max_digits=11,
+        decimal_places=2,
+        default=0,
+    )
+    profit = DecimalField(
+        verbose_name="Прибыль",
         max_digits=11,
         decimal_places=2,
         default=0,

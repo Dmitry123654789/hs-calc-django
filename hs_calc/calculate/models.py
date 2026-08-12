@@ -143,7 +143,7 @@ class ProfitRatio(Model):
         max_length=50,
     )
     ratio = DecimalField(
-        verbose_name="Коэффициент прибыли",
+        verbose_name="Коэффициент",
         max_digits=5,
         decimal_places=2,
     )
@@ -251,3 +251,8 @@ class Glukhar(BaseProduct):
         on_delete=PROTECT,
         verbose_name="Тип дерева",
     )
+
+
+class FixedExpenses(BaseMaterial):
+    class Meta:
+        db_table = "calculate_fixed_expenses"

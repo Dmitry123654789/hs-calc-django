@@ -413,8 +413,8 @@
   "model": "calculate.profitratio",
   "pk": 1,
   "fields": {
-    "name": "portal",
-    "ratio": "2.40"
+    "name": "acquiring",
+    "ratio": "0.1"
   }
 },
 {
@@ -423,6 +423,38 @@
   "fields": {
     "name": "glukhar",
     "ratio": "1.50"
+  }
+},
+{
+  "model": "calculate.profitratio",
+  "pk": 3,
+  "fields": {
+    "name": "money_transfer",
+    "ratio": "0.1"
+  }
+},
+{
+  "model": "calculate.profitratio",
+  "pk": 4,
+  "fields": {
+    "name": "revenue",
+    "ratio": "0.1"
+  }
+},
+{
+  "model": "calculate.fixedexpenses",
+  "pk": 1,
+  "fields": {
+    "name": "monthly_efficiency",
+    "price": "100"
+  }
+},
+{
+  "model": "calculate.fixedexpenses",
+  "pk": 2,
+  "fields": {
+    "name": "monthly_expenses",
+    "price": "400000"
   }
 },
 {
